@@ -18,16 +18,20 @@ canvas {
 .loading {
   position: absolute;
   right: 10px;
-  bottom: 10px;
+  top: 10px;
   display: none;
 }
 .loading.active {
   display: block;
 }
 .menu {
+  width: 100%;
   position: absolute;
-  left: 10px;
-  bottom: 10px;
+  box-sizing: border-box;
+  left: 0;
+  top: 0;
+  padding: 10px;
+  background: black;
   display: flex;
   align-items: center;
 }

@@ -17,24 +17,27 @@
 
     <div id="viewer" class="viewer"></div>
 
-    <div class="loading active">
-      Loading...
-    </div>
-
     <nav class="menu">
+      <button class="change-mode">Switch to web mode</button>
       <button class="randomize">Randomize positions</button>
-      <form method="get">
+      <form id="form" method="get">
         <label for="input-count">Enter new count:</label>
         <input id="input-count" name="count" value="10000" />
+        <input id="input-mode" name="mode" value="xr" type="hidden" />
         <button type="submit">Go</button>
       </form>
     </nav>
+
+    <div class="loading active">
+      Loading...
+    </div>
 
   </div>
 
   <script src="js/jquery-3.4.1.min.js"></script>
   <script src="js/three-r124.min.js"></script>
   <script src="js/three-orbit-controls.js"></script>
+  <script src="js/VRButton.js"></script>
   <script src="js/utils.js"></script>
   <script src="js/main.js"></script>
 

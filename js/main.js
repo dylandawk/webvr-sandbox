@@ -7,6 +7,12 @@ if (q.count) count = parseInt(q.count);
 $('#input-count').val(count);
 console.log('Count: ', count);
 
+// check for VR
+var mode = q.mode ? q.mode : 'xr';
+var isXR = (mode == 'xr');
+$('#input-mode').val(mode);
+if (!isXR) $('.change-mode').text('Switch to XR mode');
+
 var worldWidth = 4096;
 var textureUrl = 'img/texture.jpg';
 var imageW = 4096;
@@ -184,6 +190,12 @@ function loadListeners(){
     if (!isTransitioning) randomizePositions();
   });
 
+  $('.change-mode').on('click', function(){
+    if (isXR) $('#input-mode').val('web');
+    else $('#input-mode').val('xr');
+    $('#form').submit();
+  });
+
   $(window).on('resize', function(){
     w = $el.width();
     h = $el.height();
@@ -206,9 +218,15 @@ function loadScene(){
   renderer.setSize(w, h);
   $el.append(renderer.domElement);
 
+  if (isXR) {
+    document.body.appendChild( VRButton.createButton( renderer ) );
+    renderer.xr.enabled = true;
+  } else {
+    controls = new THREE.OrbitControls(camera, renderer.domElement);
+  }
+
   camera.position.set(256, 256, 256);
   camera.lookAt(new THREE.Vector3(0, 0, 0));
-  controls = new THREE.OrbitControls(camera, renderer.domElement);
 
   var axesHelper = new THREE.AxesHelper( 4096 );
   scene.add( axesHelper );
@@ -238,32 +256,43 @@ function randomizePositions(){
 
 function render(){
 
-  if (isTransitioning) {
-    var now = new Date().getTime();
-    var t = norm(now, transitionStart, transitionEnd);
+  if (isXR) {
+    renderer.setAnimationLoop( function () {
+      transition();
+      renderer.render( scene, camera );
+    });
 
-    if (t >= 1) {
-      isTransitioning = false;
-      var translateArr = geometry.getAttribute('translate').array;
-      var translateDestArr = geometry.getAttribute('translateDest').array;
-      for (var i=0; i<count; i++) {
-        var i0 = i*3;
-        translateArr[i0] = translateDestArr[i0];
-        translateArr[i0+1] = translateDestArr[i0+1]
-        translateArr[i0+2] = translateDestArr[i0+2]
-      }
-      geometry.getAttribute('translate').needsUpdate = true;
-    } else {
-      t = ease(t);
-      material.uniforms.positionTransitionPct.value = t;
-    }
+  } else {
+    transition();
+    renderer.render(scene, camera);
+    controls.update();
+    requestAnimationFrame(function(){
+      render();
+    });
   }
-
-  renderer.render(scene, camera);
-  controls.update();
-  requestAnimationFrame(function(){
-    render();
-  });
 };
+
+function transition(){
+  if (!isTransitioning) return;
+
+  var now = new Date().getTime();
+  var t = norm(now, transitionStart, transitionEnd);
+
+  if (t >= 1) {
+    isTransitioning = false;
+    var translateArr = geometry.getAttribute('translate').array;
+    var translateDestArr = geometry.getAttribute('translateDest').array;
+    for (var i=0; i<count; i++) {
+      var i0 = i*3;
+      translateArr[i0] = translateDestArr[i0];
+      translateArr[i0+1] = translateDestArr[i0+1]
+      translateArr[i0+2] = translateDestArr[i0+2]
+    }
+    geometry.getAttribute('translate').needsUpdate = true;
+  } else {
+    t = ease(t);
+    material.uniforms.positionTransitionPct.value = t;
+  }
+}
 
 loadScene();
