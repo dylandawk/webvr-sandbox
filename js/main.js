@@ -175,6 +175,7 @@ function loadCollection() {
     });
     material.uniforms.positionTransitionPct.value = 1.0;
     mesh = new THREE.Mesh(geometry, material);
+    mesh.frustumCulled = false;
     scene.add(mesh);
 
     // done loading scene
@@ -211,7 +212,7 @@ function loadScene(){
   w = $el.width();
   h = $el.height();
   scene = new THREE.Scene();
-  camera = new THREE.PerspectiveCamera( 75, w / h, 0.001, 8000 );
+  camera = new THREE.PerspectiveCamera( 75, w / h, 0.0001, 8000 );
   renderer = new THREE.WebGLRenderer({ antialias: true });
   renderer.setPixelRatio( window.devicePixelRatio );
   renderer.setClearColor( 0x000000, 0.0 );
