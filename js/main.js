@@ -228,11 +228,11 @@ function loadScene(){
   camera.position.set(256, 256, 256);
   camera.lookAt(new THREE.Vector3(0, 0, 0));
 
-  var axesHelper = new THREE.AxesHelper( 4096 );
-  scene.add( axesHelper );
-
-  var gridHelper = new THREE.GridHelper( 1024, 64 );
-  scene.add( gridHelper );
+  // var axesHelper = new THREE.AxesHelper( 4096 );
+  // scene.add( axesHelper );
+  //
+  // var gridHelper = new THREE.GridHelper( 1024, 64 );
+  // scene.add( gridHelper );
 
   //render();
   loadCollection();
