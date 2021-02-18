@@ -1,0 +1,10 @@
+{
+  "name": "webvr-sandbox",
+  "description": "WebVR Sandbox",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "devDependencies": {
+    "express": "^4.17.1"
+  }
+}

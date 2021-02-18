@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8">
+  <title>Collection Visualization WebVR Sandbox</title>
+  <meta name="description" content="">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+
+  <link rel="stylesheet" href="css/normalize.css">
+  <link rel="stylesheet" href="css/main.css">
+</head>
+
+<body>
+
+  <div id="app" class="app">
+
+    <div id="viewer" class="viewer"></div>
+
+    <div class="loading active">
+      Loading...
+    </div>
+
+    <nav class="menu">
+      <button class="randomize">Randomize positions</button>
+      <form method="get">
+        <label for="input-count">Enter new count:</label>
+        <input id="input-count" name="count" value="10000" />
+        <button type="submit">Go</button>
+      </form>
+    </nav>
+
+  </div>
+
+  <script src="js/jquery-3.4.1.min.js"></script>
+  <script src="js/three-r124.min.js"></script>
+  <script src="js/three-orbit-controls.js"></script>
+  <script src="js/utils.js"></script>
+  <script src="js/main.js"></script>
+
+</body>
+
+</html>
