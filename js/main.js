@@ -2,6 +2,7 @@
 
 import { XRControllerModelFactory } from '../node_modules/three/examples/jsm/webxr/XRControllerModelFactory.js';
 import { XRHandModelFactory } from '../node_modules/three/examples/jsm/webxr/XRHandModelFactory.js';
+import { GLTFLoader } from '../node_modules/three/examples/jsm/loaders/GLTFLoader.js';
 
 // get count from URL
 var count = 10000;
@@ -48,6 +49,13 @@ var pointsMesh;
 const intersected = [];
 const tempMatrix = new THREE.Matrix4();
 
+//model
+var model, objGroup;
+var objects = [];
+
+//object
+var object = new THREE.Object3D();
+
 //Camera move
 var dolly;
 var cameraVector = new THREE.Vector3(); // create once and reuse it!
@@ -57,7 +65,6 @@ const prevGamePads = new Map();
 //default values for speed movement of each axis
 var speedFactor = [0.1, 0.1, 0.1, 0.1];
 //
-
 
 var MaterialVertexShader = `
 precision mediump float;
@@ -115,6 +122,40 @@ gl_FragColor.rgb = mix( gl_FragColor.rgb, fogColor, d );
 gl_FragColor.a = 1.;
 }
 `;
+
+function loadControllers(){
+  controller1 = renderer.xr.getController( 0 );
+  controller1.addEventListener( 'selectstart', onSelectStart );
+  controller1.addEventListener( 'selectend', onSelectEnd );
+  scene.add( controller1 );
+
+  controller2 = renderer.xr.getController( 1 );
+  controller2.addEventListener( 'selectstart', onSelectStart );
+  controller2.addEventListener( 'selectend', onSelectEnd );
+  scene.add( controller2 );
+
+  const controllerModelFactory = new XRControllerModelFactory();
+  const handModelFactory = new XRHandModelFactory().setPath( "../node_modules/three/examples/models/fbx/" ); 
+
+  //Hand 1
+  controllerGrip1 = renderer.xr.getControllerGrip( 0 );
+  controllerGrip1.add( controllerModelFactory.createControllerModel( controllerGrip1 ) );
+  scene.add( controllerGrip1 );
+
+  hand1 = renderer.xr.getHand( 0 );
+  hand1.add( handModelFactory.createHandModel( hand1, "oculus" ) );
+
+  scene.add( hand1 );
+
+  //Hand 2
+  controllerGrip2 = renderer.xr.getControllerGrip( 1 );
+  controllerGrip2.add( controllerModelFactory.createControllerModel( controllerGrip2 ) );
+  scene.add( controllerGrip2 ); 
+
+  hand2 = renderer.xr.getHand( 1 );
+  hand2.add( handModelFactory.createHandModel( hand2, "oculus" ) );
+  scene.add( hand2 );
+}
 
 function loadCollection() {
 
@@ -264,41 +305,9 @@ function loadScene(){
   renderer.setSize(w, h);
   $el.append(renderer.domElement);
 
-  //controllers -----------------------------
-  controller1 = renderer.xr.getController( 0 );
-  controller1.addEventListener( 'selectstart', onSelectStart );
-  controller1.addEventListener( 'selectend', onSelectEnd );
-  scene.add( controller1 );
-
-  controller2 = renderer.xr.getController( 1 );
-  controller2.addEventListener( 'selectstart', onSelectStart );
-  controller2.addEventListener( 'selectend', onSelectEnd );
-  scene.add( controller2 );
-
-  const controllerModelFactory = new XRControllerModelFactory();
-  const handModelFactory = new XRHandModelFactory().setPath( "./models/fbx/" );
-
-  //Hand 1
-  controllerGrip1 = renderer.xr.getControllerGrip( 0 );
-  controllerGrip1.add( controllerModelFactory.createControllerModel( controllerGrip1 ) );
-  scene.add( controllerGrip1 );
-
-  hand1 = renderer.xr.getHand( 0 );
-  hand1.add( handModelFactory.createHandModel( hand1 ) );
-
-  scene.add( hand1 );
-
-  //Hand 2
-  controllerGrip2 = renderer.xr.getControllerGrip( 1 );
-  controllerGrip2.add( controllerModelFactory.createControllerModel( controllerGrip2 ) );
-  scene.add( controllerGrip2 );
-
-  hand2 = renderer.xr.getHand( 1 );
-  hand2.add( handModelFactory.createHandModel( hand2 ) );
-  scene.add( hand2 );
-  //
-
   const geometry = new THREE.BufferGeometry().setFromPoints( [ new THREE.Vector3( 0, 0, 0 ), new THREE.Vector3( 0, 0, - 1 ) ] );
+
+  loadControllers();
 
   const line = new THREE.Line( geometry );
   line.name = 'line';
@@ -341,43 +350,14 @@ function loadScene(){
   group = new THREE.Group();
   scene.add(group);
 
-  //Geometries for testing
-  const geometries = [
-    new THREE.BoxGeometry( 0.2, 0.2, 0.2 ),
-    new THREE.ConeGeometry( 0.2, 0.2, 64 ),
-    new THREE.CylinderGeometry( 0.2, 0.2, 0.2, 64 ),
-    new THREE.IcosahedronGeometry( 0.2, 8 ),
-    new THREE.TorusGeometry( 0.2, 0.04, 64, 32 )
-  ];
-
-  for ( let i = 0; i < 20; i ++ ) {
-
-    const geometry = geometries[ Math.floor( Math.random() * geometries.length ) ];
-    const material = new THREE.MeshStandardMaterial( {
-      color: Math.random() * 0xffffff,
-      roughness: 0.7,
-      metalness: 0.0
-    } );
-
-    const object = new THREE.Mesh( geometry, material );
-
-    object.position.x = Math.random() * 4 - 2;
-    object.position.y = Math.random() * 2;
-    object.position.z = Math.random() * 4 - 2;
-
-    object.rotation.x = Math.random() * 2 * Math.PI;
-    object.rotation.y = Math.random() * 2 * Math.PI;
-    object.rotation.z = Math.random() * 2 * Math.PI;
-
-    object.scale.setScalar( Math.random() + 0.5 );
-
-    object.castShadow = true;
-    object.receiveShadow = true;
-
-    group.add( object );
-
-  }
-//
+  drawTestObjects();
+  drawUI();
+  
+  group.position.y+=1;  
+  group.position.z-=2;  
+  group.rotation.x = -0.55*Math.PI;
+  group.rotation.z = Math.PI;
+  group.scale.set(0.025,0.025,0.025); // scale here
 
 //Light
 const light = new THREE.DirectionalLight( 0xffffff );
@@ -390,6 +370,9 @@ const light = new THREE.DirectionalLight( 0xffffff );
   light.shadow.mapSize.set( 4096, 4096 );
   scene.add( light );
 //
+
+  var ambient = new THREE.AmbientLight( 0xffffff );
+  scene.add(ambient);
 
   if (isXR) {
   document.body.appendChild( VRButton.createButton( renderer ) );
@@ -409,8 +392,6 @@ const light = new THREE.DirectionalLight( 0xffffff );
 
   //render();
   loadCollection();
-
-
 
   window.addEventListener( 'resize', onWindowResize );
 }
@@ -436,10 +417,18 @@ function randomizePositions(){
   isTransitioning = true;
 }
 
+function rotateModel(){
+  var timer = Date.now() * 0.0001;
+  if (model) model.rotation.z = 0.25*Math.PI + (Math.abs(Math.sin( timer )) * 4);
+}
+
 function render(){
 
   if (isXR) {
-    renderer.setAnimationLoop( function () {
+      renderer.setAnimationLoop( function () {
+
+      //rotateModel();
+
       transition();
 
       cleanIntersected();
@@ -453,6 +442,8 @@ function render(){
       //add gamepad polling for webxr to renderloop
       //dollyMove();
 
+      VRCameraControls(dolly, prevGamePads, speedFactor, camera, cameraVector, renderer);
+
       renderer.render( scene, camera );
     });
 
@@ -462,7 +453,7 @@ function render(){
     controls.update();
     intersectFromCursor();
     requestAnimationFrame(function(){
-      render();
+    render();
     });
   }
 };
@@ -511,17 +502,25 @@ function onSelectStart( event ) {
   const intersections = getIntersections( controller );
 
   if ( intersections.length > 0 ) {
-
     const intersection = intersections[ 0 ];
 
     const object = intersection.object;
-    object.material.emissive.b = 1;
+    object.material.emissive.b = 0.2;
     controller.attach( object );
 
     controller.userData.selected = object;
 
+    console.log("SELECTED OBJECT:  " + object.name);  
   }
+}
 
+function getContainerObjByChild(obj) {
+  
+   if(obj.userData.isContainer) return obj
+
+   else if(obj.parent != null) return getContainerObjByChild(obj.parent)
+
+   else return null
 }
 
 function onSelectEnd( event ) {
@@ -566,7 +565,7 @@ function intersectObjects( controller ) {
     const intersection = intersections[ 0 ];
 
     const object = intersection.object;
-    object.material.emissive.r = 1;
+    object.material.emissive.r = 0.2;
     intersected.push( object );
 
     line.scale.z = intersection.distance;
@@ -576,7 +575,6 @@ function intersectObjects( controller ) {
     line.scale.z = 5;
 
   }
-
 }
 
 function intersectPoints( controller, index ){
@@ -632,178 +630,119 @@ function cleanIntersected() {
     object.material.emissive.r = 0;
 
   }
-
 }
-//
 
-//Camera move in VR
-function dollyMove() {
-var handedness = "unknown";
+var ITEM_NAMES = ['bracelet_cleaned.gltf', 'beardish.gltf'];
 
-//determine if we are in an xr session
-const session = renderer.xr.getSession();
-let i = 0;
+function drawTestObjects() {
 
-if (session) {
-let xrCamera = renderer.xr.getCamera(camera);
-xrCamera.getWorldDirection(cameraVector);
+const loader = new GLTFLoader().setPath( '../content/3d/' );
+loader.load( ITEM_NAMES[0], function ( gltf ) {
+  model = gltf.scene;
+  model.name = 'interactible'; // OR
+  model.userData.isContainer = true;
+  
+  model.position.y+=1;  
+  model.position.z-=2;  
+  model.rotation.x = -0.55*Math.PI;
+  model.rotation.z = Math.PI;
+  model.scale.set(0.025,0.025,0.025); // scale here
 
-//a check to prevent console errors if only one input source
-if (isIterable(session.inputSources)) {
-for (const source of session.inputSources) {
-  if (source && source.handedness) {
-    handedness = source.handedness; //left or right controllers
-  }
-  if (!source.gamepad) continue;
-  const controller = renderer.xr.getController(i++);
-  const old = prevGamePads.get(source);
-  const data = {
-    handedness: handedness,
-    buttons: source.gamepad.buttons.map((b) => b.value),
-    axes: source.gamepad.axes.slice(0)
-  };
-  if (old) {
-    data.buttons.forEach((value, i) => {
-      //handlers for buttons
-      if (value !== old.buttons[i] || Math.abs(value) > 0.8) {
-        //check if it is 'all the way pushed'
-        if (value === 1) {
-          //console.log("Button" + i + "Down");
-          if (data.handedness == "left") {
-            //console.log("Left Paddle Down");
-            if (i == 1) {
-              dolly.rotateY(-THREE.Math.degToRad(1));
-            }
-            if (i == 3) {
-              //reset teleport to home position
-              dolly.position.x = 0;
-              dolly.position.y = 5;
-              dolly.position.z = 0;
-            }
-          } else {
-            //console.log("Right Paddle Down");
-            if (i == 1) {
-              dolly.rotateY(THREE.Math.degToRad(1));
-            }
-          }
-        } else {
-          // console.log("Button" + i + "Up");
+  model.traverse( function ( child ) {
+        if ( child.isMesh ) {
+            child.geometry.center(); // center here
 
-          if (i == 1) {
-            //use the paddle buttons to rotate
-            if (data.handedness == "left") {
-              //console.log("Left Paddle Down");
-              dolly.rotateY(-THREE.Math.degToRad(Math.abs(value)));
-            } else {
-              //console.log("Right Paddle Down");
-              dolly.rotateY(THREE.Math.degToRad(Math.abs(value)));
-            }
-          }
+            object = child; 
+            group.add( object );     
         }
-      }
+        if ( child.material ) child.material.metalness = 0.5;
     });
-    data.axes.forEach((value, i) => {
-      //handlers for thumbsticks
-      //if thumbstick axis has moved beyond the minimum threshold from center, windows mixed reality seems to wander up to about .17 with no input
-      if (Math.abs(value) > 0.2) {
-        //set the speedFactor per axis, with acceleration when holding above threshold, up to a max speed
-        speedFactor[i] > 1 ? (speedFactor[i] = 1) : (speedFactor[i] *= 1.001);
-        console.log(value, speedFactor[i], i);
-        if (i == 2) {
-          //left and right axis on thumbsticks
-          if (data.handedness == "left") {
-            // (data.axes[2] > 0) ? console.log('left on left thumbstick') : console.log('right on left thumbstick')
 
-            //move our dolly
-            //we reverse the vectors 90degrees so we can do straffing side to side movement
-            dolly.position.x -= cameraVector.z * speedFactor[i] * data.axes[2];
-            dolly.position.z += cameraVector.x * speedFactor[i] * data.axes[2];
+  //objGroup.add( model );
+  scene.add( model );
+  
+  //detectIntersections( controller1, raycaster, tempMatrix, model );
 
-            //provide haptic feedback if available in browser
-            if (
-              source.gamepad.hapticActuators &&
-              source.gamepad.hapticActuators[0]
-            ) {
-              var pulseStrength = Math.abs(data.axes[2]) + Math.abs(data.axes[3]);
-              if (pulseStrength > 0.75) {
-                pulseStrength = 0.75;
-              }
+}, (xhr) => xhr, ( err ) => console.error( e ));
 
-              var didPulse = source.gamepad.hapticActuators[0].pulse(
-                pulseStrength,
-                100
-              );
-            }
-          } else {
-            // (data.axes[2] > 0) ? console.log('left on right thumbstick') : console.log('right on right thumbstick')
-            dolly.rotateY(-THREE.Math.degToRad(data.axes[2]));
-          }
-          controls.update();
-        }
 
-        if (i == 3) {
-          //up and down axis on thumbsticks
-          if (data.handedness == "left") {
-            // (data.axes[3] > 0) ? console.log('up on left thumbstick') : console.log('down on left thumbstick')
-            dolly.position.y -= speedFactor[i] * data.axes[3];
-            //provide haptic feedback if available in browser
-            if (
-              source.gamepad.hapticActuators &&
-              source.gamepad.hapticActuators[0]
-            ) {
-              var pulseStrength = Math.abs(data.axes[3]);
-              if (pulseStrength > 0.75) {
-                pulseStrength = 0.75;
-              }
-              var didPulse = source.gamepad.hapticActuators[0].pulse(
-                pulseStrength,
-                100
-              );
-            }
-          } else {
-            // (data.axes[3] > 0) ? console.log('up on right thumbstick') : console.log('down on right thumbstick')
-            dolly.position.x -= cameraVector.x * speedFactor[i] * data.axes[3];
-            dolly.position.z -= cameraVector.z * speedFactor[i] * data.axes[3];
+/* Geometries for testing
+  const geometries = [
+  new THREE.BoxGeometry( 0.2, 0.2, 0.2 ),
+  new THREE.ConeGeometry( 0.2, 0.2, 64 ),
+  new THREE.CylinderGeometry( 0.2, 0.2, 0.2, 64 ),
+  new THREE.IcosahedronGeometry( 0.2, 8 ),
+  new THREE.TorusGeometry( 0.2, 0.04, 64, 32 )
+  ];
 
-            //provide haptic feedback if available in browser
-            if (
-              source.gamepad.hapticActuators &&
-              source.gamepad.hapticActuators[0]
-            ) {
-              var pulseStrength = Math.abs(data.axes[2]) + Math.abs(data.axes[3]);
-              if (pulseStrength > 0.75) {
-                pulseStrength = 0.75;
-              }
-              var didPulse = source.gamepad.hapticActuators[0].pulse(
-                pulseStrength,
-                100
-              );
-            }
-          }
-          controls.update();
-        }
-      } else {
-        //axis below threshold - reset the speedFactor if it is greater than zero  or 0.025 but below our threshold
-        if (Math.abs(value) > 0.025) {
-          speedFactor[i] = 0.025;
-        }
-      }
-    });
+  for ( let i = 0; i < 20; i ++ ) {
+    const geometry = geometries[ Math.floor( Math.random() * geometries.length ) ];   
+    const material = new THREE.MeshStandardMaterial( {
+      color: Math.random() * 0xffffff,
+      roughness: 0.7,
+      metalness: 0.0
+    } );
+
+    const object = new THREE.Mesh( geometry, material );
+
+    object.position.x = Math.random() * 4 - 2;
+    object.position.y = Math.random() * 2;
+    object.position.z = Math.random() * 4 - 2;
+
+    object.rotation.x = Math.random() * 2 * Math.PI;
+    object.rotation.y = Math.random() * 2 * Math.PI;
+    object.rotation.z = Math.random() * 2 * Math.PI;
+
+    object.scale.setScalar( Math.random() + 0.5 );
+
+    object.castShadow = false;
+    object.receiveShadow = false;
+
+    group.add( object );
   }
-  prevGamePads.set(source, data);
-}
-}
-}
+  */
 }
 
-function isIterable(obj) {
-// checks for null and undefined
-if (obj == null) {
-return false;
+function drawUI() {
+
+  var loader = new THREE.TextureLoader();
+  var texture = loader.load( '../img/ui-controls-solid.png' );
+  
+  const geometry = new THREE.PlaneGeometry( 19, 12, 32 );
+  const material = new THREE.MeshBasicMaterial( { map: texture, opacity: 0.8, transparent: true,  depthWrite: true, blending: THREE.NormalBlending } );
+
+  const UIMaterial = new THREE.SpriteMaterial({
+      map: texture,
+      transparent: true,
+      opacity: 0.8,
+      depthWrite: false, 
+      depthTest: false 
+  });
+
+  const plane = new THREE.Mesh( geometry, material );
+  plane.position.set(0, 0, camera.position.z -10); //plane.position.z = camera.position.z -30;
+  plane.quaternion.copy( camera.quaternion );
+  scene.add( plane );
+  /*
+  const label = new THREE.Sprite(UIMaterial);
+  label.position.set(3, 3, camera.position.z -5);
+  label.width = 40;
+  label.height = 24;
+  label.quaternion.copy( camera.quaternion );
+  scene.add( label );
+
+  var testGeo = new THREE.PlaneBufferGeometry();
+  var testMat = new THREE.MeshBasicMaterial( { map: texture, opacity: 0.8, transparent: true,  depthWrite: false, depthTest: false  } );
+
+  var testMesh = new THREE.Mesh( testGeo, testMat );
+  testMesh.position.set(-3, 3, camera.position.z -5);
+  testMesh.quaternion.copy( camera.quaternion );
+  testMesh.width = 80;
+  testMesh.height = 48;
+  scene.add( testMesh );
+  */
 }
-return typeof obj[Symbol.iterator] === "function";
-}
-//
+
 
 loadScene();
 animate();
