@@ -30,6 +30,7 @@ var transitionDuration = 4000;
 var $el, w, h, scene, camera, renderer, controls, group;
 var firstLoaded = false;
 var geometry, material;
+var pointGeo;
 var mesh;
 var transitionStart, transitionEnd;
 var isTransitioning = false;
@@ -41,6 +42,8 @@ var hand1, hand2;
 
 var raycaster;
 var pointRaycaster;
+var highlighter1, highlighter2;
+var pointsMesh;
 
 const intersected = [];
 const tempMatrix = new THREE.Matrix4();
@@ -179,6 +182,17 @@ function loadCollection() {
     geometry.getAttribute(attr.name).needsUpdate = true
   }
 
+  // load point geometry for raycasting
+  pointGeo = new THREE.BufferGeometry();
+  pointGeo.setAttribute( 'position', new THREE.BufferAttribute( translateDestArr, 3 ) );
+  pointGeo.setAttribute( 'color', new THREE.BufferAttribute( colorArr, 3 ) );
+  pointGeo.computeBoundingBox();
+  var pointMat = new THREE.PointsMaterial( { size: cellW, vertexColors: true } );
+  pointsMesh = new THREE.Points( pointGeo, pointMat );
+  pointsMesh.visible = false;
+  pointsMesh.layers.enable( 7 );
+  scene.add( pointsMesh );
+
   // load texture
   var textureLoader = new THREE.TextureLoader();
   var texture = textureLoader.load(textureUrl, function() {
@@ -294,8 +308,22 @@ function loadScene(){
   controller2.add( line.clone() );
 
   raycaster = new THREE.Raycaster();
+
   pointRaycaster = new THREE.Raycaster();
   pointRaycaster.params.Points.threshold = cellW / 2;
+  pointRaycaster.layers.set( 7 );
+  const highlightGeo1 = new THREE.SphereGeometry( 16, 32, 32 );
+  const highlightGeo2 = new THREE.SphereGeometry( 16, 32, 32 );
+  const highlightMat1 = new THREE.MeshBasicMaterial( {color: 0x00ff00, transparent: true} );
+  const highlightMat2 = new THREE.MeshBasicMaterial( {color: 0xff0000, transparent: true} );
+  highlighter1 = new THREE.Mesh( highlightGeo1, highlightMat1 );
+  highlighter1.opacity = 0.5;
+  highlighter1.visible = false;
+  highlighter2 = new THREE.Mesh( highlightGeo2, highlightMat2 );
+  highlighter2.opacity = 0.5;
+  highlighter2.visible = false;
+  scene.add( highlighter1 );
+  scene.add( highlighter2 );
 
   //Dolly for camera
   dolly = new THREE.Group();
@@ -390,13 +418,18 @@ const light = new THREE.DirectionalLight( 0xffffff );
 function randomizePositions(){
   var positions = getRandomPositions(count, worldWidth);
   var translateDestArr = geometry.getAttribute('translateDest').array;
+  var pointPosArr = pointGeo.getAttribute('position').array;
   for (var i=0; i<count; i++) {
     var i0 = i*3;
     translateDestArr[i0] = positions[i][0];
     translateDestArr[i0+1] = positions[i][1];
     translateDestArr[i0+2] = positions[i][2];
+    pointPosArr[i0] = positions[i][0];
+    pointPosArr[i0+1] = positions[i][1];
+    pointPosArr[i0+2] = positions[i][2];
   }
   geometry.getAttribute('translateDest').needsUpdate = true;
+  pointGeo.getAttribute('position').needsUpdate = true;
 
   transitionStart = new Date().getTime();
   transitionEnd = transitionStart + transitionDuration;
@@ -414,6 +447,9 @@ function render(){
       intersectObjects( controller1 );
       intersectObjects( controller2 );
 
+      intersectPoints( controller1, 0 );
+      intersectPoints( controller2, 1 );
+
       //add gamepad polling for webxr to renderloop
       //dollyMove();
 
@@ -424,6 +460,7 @@ function render(){
     transition();
     renderer.render(scene, camera);
     controls.update();
+    intersectFromCursor();
     requestAnimationFrame(function(){
       render();
     });
@@ -503,14 +540,16 @@ function onSelectEnd( event ) {
 }
 
 //Controllers
-function getIntersections( controller ) {
+function getIntersections( controller, targetObjects, theRaycaster ) {
+  theRaycaster = theRaycaster || raycaster;
 
   tempMatrix.identity().extractRotation( controller.matrixWorld );
 
-  raycaster.ray.origin.setFromMatrixPosition( controller.matrixWorld );
-  raycaster.ray.direction.set( 0, 0, - 1 ).applyMatrix4( tempMatrix );
+  theRaycaster.ray.origin.setFromMatrixPosition( controller.matrixWorld );
+  theRaycaster.ray.direction.set( 0, 0, - 1 ).applyMatrix4( tempMatrix );
 
-  return raycaster.intersectObjects( group.children );
+  targetObjects = targetObjects || group.children;
+  return theRaycaster.intersectObjects( targetObjects );
 }
 
 function intersectObjects( controller ) {
@@ -538,6 +577,51 @@ function intersectObjects( controller ) {
 
   }
 
+}
+
+function intersectPoints( controller, index ){
+  const intersections = getIntersections( controller, [pointsMesh], pointRaycaster );
+  const highlighter = index <= 0 ? highlighter1 : highlighter2;
+  highlighter.visible = false;
+
+  if ( intersections && intersections.length > 0 ) {
+
+    const intersection = intersections[ 0 ];
+    var index = intersection.index;
+    var pointPosArr = pointGeo.getAttribute('position').array;
+    var x = pointPosArr[ 3 * index ];
+    var y = pointPosArr[ 3 * index + 1 ];
+    var z = pointPosArr[ 3 * index + 2 ];
+    highlighter1.position.set(x, y, z);
+    highlighter1.visible = true;
+
+  }
+}
+
+var mouse = new THREE.Vector2();
+function onDocumentMouseMove( event ) {
+  event.preventDefault();
+  mouse.x = ( event.clientX / window.innerWidth ) * 2 - 1;
+  mouse.y = - ( event.clientY / window.innerHeight ) * 2 + 1;
+}
+document.addEventListener( 'mousemove', onDocumentMouseMove, false );
+
+function intersectFromCursor(){
+  pointRaycaster.setFromCamera( mouse, camera );
+  var intersections = pointRaycaster.intersectObjects( [pointsMesh] );
+  var intersection = ( intersections.length ) > 0 ? intersections[ 0 ] : null;
+
+  if ( intersection !== null ) {
+    var index = intersection.index;
+    var pointPosArr = pointGeo.getAttribute('position').array;
+    var x = pointPosArr[ 3 * index ];
+    var y = pointPosArr[ 3 * index + 1 ];
+    var z = pointPosArr[ 3 * index + 2 ];
+    highlighter1.position.set(x, y, z);
+    highlighter1.visible = true;
+  } else {
+    highlighter1.visible = false;
+  }
 }
 
 function cleanIntersected() {
