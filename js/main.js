@@ -1,6 +1,6 @@
 'use strict';
 
-import { XRControllerModelFactory } from '../node_modules/three/examples/jsm/webxr/XRControllerModelFactory.js';  
+import { XRControllerModelFactory } from '../node_modules/three/examples/jsm/webxr/XRControllerModelFactory.js';
 import { XRHandModelFactory } from '../node_modules/three/examples/jsm/webxr/XRHandModelFactory.js';
 
 // get count from URL
@@ -40,6 +40,7 @@ var controllerGrip1, controllerGrip2;
 var hand1, hand2;
 
 var raycaster;
+var pointRaycaster;
 
 const intersected = [];
 const tempMatrix = new THREE.Matrix4();
@@ -114,204 +115,206 @@ gl_FragColor.a = 1.;
 
 function loadCollection() {
 
-// create the geometry
-var planeGeom = new THREE.PlaneBufferGeometry(1, 1);
-geometry = new THREE.InstancedBufferGeometry();
-geometry.copy(planeGeom);
-geometry.instanceCount = count;
-var uvAttr = geometry.getAttribute('uv');
-uvAttr.needsUpdate = true;
-for (var i = 0; i < uvAttr.array.length; i++) {
-uvAttr.array[i] /= imageW;
-}
-// define the shader attributes topology
-var attributes = [
-{name: 'uvOffset', size: 2},
-{name: 'translate', size: 3},
-{name: 'translateDest', size: 3},
-{name: 'actualSize', size: 3},
-{name: 'color', size: 3}
-];
-for (var attr of attributes) {
-// allocate the buffer
-var buffer = new Float32Array(geometry.instanceCount * attr.size);
-var buffAttr = new THREE.InstancedBufferAttribute(buffer, attr.size, false, 1);
-buffAttr.setUsage(THREE.DynamicDrawUsage);
-geometry.setAttribute(attr.name, buffAttr);
-}
+  // create the geometry
+  var planeGeom = new THREE.PlaneBufferGeometry(1, 1);
+  geometry = new THREE.InstancedBufferGeometry();
+  geometry.copy(planeGeom);
+  geometry.instanceCount = count;
+  var uvAttr = geometry.getAttribute('uv');
+  uvAttr.needsUpdate = true;
+  for (var i = 0; i < uvAttr.array.length; i++) {
+    uvAttr.array[i] /= imageW;
+  }
+  // define the shader attributes topology
+  var attributes = [
+    {name: 'uvOffset', size: 2},
+    {name: 'translate', size: 3},
+    {name: 'translateDest', size: 3},
+    {name: 'actualSize', size: 3},
+    {name: 'color', size: 3}
+  ];
+  for (var attr of attributes) {
+    // allocate the buffer
+    var buffer = new Float32Array(geometry.instanceCount * attr.size);
+    var buffAttr = new THREE.InstancedBufferAttribute(buffer, attr.size, false, 1);
+    buffAttr.setUsage(THREE.DynamicDrawUsage);
+    geometry.setAttribute(attr.name, buffAttr);
+  }
 
-// set uv offset to random cell
-var uvOffsetArr = geometry.getAttribute('uvOffset').array;
-var yt = 1.0/cols;
-for (var i=0; i<count; i++) {
-var randomIndex = getRandomInt(0, cellCount-1);
-var i0 = randomIndex*2;
-var y = parseInt(randomIndex / cols) / cols;
-var x = (randomIndex % cols) / cols;
-uvOffsetArr[i0] = x;
-uvOffsetArr[i0 + 1] = Math.max(1.0-y-yt, 0.0);
-}
+  // set uv offset to random cell
+  var uvOffsetArr = geometry.getAttribute('uvOffset').array;
+  var yt = 1.0/cols;
+  for (var i=0; i<count; i++) {
+    var randomIndex = getRandomInt(0, cellCount-1);
+    var i0 = randomIndex*2;
+    var y = parseInt(randomIndex / cols) / cols;
+    var x = (randomIndex % cols) / cols;
+    uvOffsetArr[i0] = x;
+    uvOffsetArr[i0 + 1] = Math.max(1.0-y-yt, 0.0);
+  }
 
-// set translates and colors
-var positions = getRandomPositions(count, worldWidth);
-var sizeArr = geometry.getAttribute('actualSize').array;
-var translateArr = geometry.getAttribute('translate').array;
-var translateDestArr = geometry.getAttribute('translateDest').array;
-var colorArr = geometry.getAttribute('color').array;
-for (var i=0; i<count; i++) {
-var i0 = i*3;
-sizeArr[i0] = cellW;
-sizeArr[i0+1] = cellH;
-sizeArr[i0+2] = 1;
-translateArr[i0] = positions[i][0];
-translateArr[i0+1] = positions[i][1];
-translateArr[i0+2] = positions[i][2];
-translateDestArr[i0] = positions[i][0];
-translateDestArr[i0+1] = positions[i][1];
-translateDestArr[i0+2] = positions[i][2];
-colorArr[i0] = 1;
-colorArr[i0+1] = 1;
-colorArr[i0+2] = 1;
-}
+  // set translates and colors
+  var positions = getRandomPositions(count, worldWidth);
+  var sizeArr = geometry.getAttribute('actualSize').array;
+  var translateArr = geometry.getAttribute('translate').array;
+  var translateDestArr = geometry.getAttribute('translateDest').array;
+  var colorArr = geometry.getAttribute('color').array;
+  for (var i=0; i<count; i++) {
+    var i0 = i*3;
+    sizeArr[i0] = cellW;
+    sizeArr[i0+1] = cellH;
+    sizeArr[i0+2] = 1;
+    translateArr[i0] = positions[i][0];
+    translateArr[i0+1] = positions[i][1];
+    translateArr[i0+2] = positions[i][2];
+    translateDestArr[i0] = positions[i][0];
+    translateDestArr[i0+1] = positions[i][1];
+    translateDestArr[i0+2] = positions[i][2];
+    colorArr[i0] = 1;
+    colorArr[i0+1] = 1;
+    colorArr[i0+2] = 1;
+  }
 
-for (var attr of attributes) {
-geometry.getAttribute(attr.name).needsUpdate = true
-}
+  for (var attr of attributes) {
+    geometry.getAttribute(attr.name).needsUpdate = true
+  }
 
-// load texture
-var textureLoader = new THREE.TextureLoader();
-var texture = textureLoader.load(textureUrl, function() {
-console.log('Loaded texture');
+  // load texture
+  var textureLoader = new THREE.TextureLoader();
+  var texture = textureLoader.load(textureUrl, function() {
+    console.log('Loaded texture');
 
-// load material
-material = new THREE.ShaderMaterial({
-uniforms: {
-  map: {type: "t", value: texture },
-  positionTransitionPct: {type: "f", value: 0.0},
-  ///fog
-  fogColor: {type: "v3", value: new THREE.Vector3()},
-  fogDistance: {type: "f", value: 5000}
-},
-vertexShader: MaterialVertexShader,
-fragmentShader: MaterialFragmentShader,
-depthTest: true,
-depthWrite: true,
-transparent: true
-});
-material.uniforms.positionTransitionPct.value = 1.0;
+    // load material
+    material = new THREE.ShaderMaterial({
+    uniforms: {
+      map: {type: "t", value: texture },
+      positionTransitionPct: {type: "f", value: 0.0},
+      ///fog
+      fogColor: {type: "v3", value: new THREE.Vector3()},
+      fogDistance: {type: "f", value: 5000}
+    },
+    vertexShader: MaterialVertexShader,
+    fragmentShader: MaterialFragmentShader,
+    depthTest: true,
+    depthWrite: true,
+    transparent: true
+    });
+    material.uniforms.positionTransitionPct.value = 1.0;
 
-mesh = new THREE.Mesh(geometry, material);
-mesh.frustumCulled = false;
+    mesh = new THREE.Mesh(geometry, material);
+    mesh.frustumCulled = false;
 
-const obj = new THREE.Mesh( geometry, material );
+    const obj = new THREE.Mesh( geometry, material );
 
-scene.add(mesh);
-//group.add(obj);
+    scene.add(mesh);
+    //group.add(obj);
 
-// done loading scene
-$('.loading').removeClass('active');
-loadListeners();
-render();
-});
+    // done loading scene
+    $('.loading').removeClass('active');
+    loadListeners();
+    render();
+  });
 }
 
 function loadListeners(){
 
-$('.randomize').on('click', function(){
-if (!isTransitioning) randomizePositions();
-});
+  $('.randomize').on('click', function(){
+    if (!isTransitioning) randomizePositions();
+  });
 
-$('.change-mode').on('click', function(){
-if (isXR) $('#input-mode').val('web');
-else $('#input-mode').val('xr');
-$('#form').submit();
-});
+  $('.change-mode').on('click', function(){
+    if (isXR) $('#input-mode').val('web');
+    else $('#input-mode').val('xr');
+    $('#form').submit();
+  });
 
-$(window).on('resize', function(){
-w = $el.width();
-h = $el.height();
-camera.aspect = w / h;
-camera.updateProjectionMatrix();
-renderer.setSize(w, h);
-});
+  $(window).on('resize', function(){
+    w = $el.width();
+    h = $el.height();
+    camera.aspect = w / h;
+    camera.updateProjectionMatrix();
+    renderer.setSize(w, h);
+  });
 
 }
 
 function loadScene(){
-$el = $('#viewer');
-w = $el.width();
-h = $el.height();
-scene = new THREE.Scene();
-camera = new THREE.PerspectiveCamera( 75, w / h, 0.0001, 8000 );
-renderer = new THREE.WebGLRenderer({ antialias: true });
-renderer.setPixelRatio( window.devicePixelRatio );
-renderer.setClearColor( 0x000000, 0.0 );
-renderer.setSize(w, h);
-$el.append(renderer.domElement);
+  $el = $('#viewer');
+  w = $el.width();
+  h = $el.height();
+  scene = new THREE.Scene();
+  camera = new THREE.PerspectiveCamera( 75, w / h, 0.0001, 8000 );
+  renderer = new THREE.WebGLRenderer({ antialias: true });
+  renderer.setPixelRatio( window.devicePixelRatio );
+  renderer.setClearColor( 0x000000, 0.0 );
+  renderer.setSize(w, h);
+  $el.append(renderer.domElement);
 
-//controllers -----------------------------
-controller1 = renderer.xr.getController( 0 );
-controller1.addEventListener( 'selectstart', onSelectStart );
-controller1.addEventListener( 'selectend', onSelectEnd );
-scene.add( controller1 );
+  //controllers -----------------------------
+  controller1 = renderer.xr.getController( 0 );
+  controller1.addEventListener( 'selectstart', onSelectStart );
+  controller1.addEventListener( 'selectend', onSelectEnd );
+  scene.add( controller1 );
 
-controller2 = renderer.xr.getController( 1 );
-controller2.addEventListener( 'selectstart', onSelectStart );
-controller2.addEventListener( 'selectend', onSelectEnd );
-scene.add( controller2 );
+  controller2 = renderer.xr.getController( 1 );
+  controller2.addEventListener( 'selectstart', onSelectStart );
+  controller2.addEventListener( 'selectend', onSelectEnd );
+  scene.add( controller2 );
 
-const controllerModelFactory = new XRControllerModelFactory();
-const handModelFactory = new XRHandModelFactory().setPath( "./models/fbx/" );
+  const controllerModelFactory = new XRControllerModelFactory();
+  const handModelFactory = new XRHandModelFactory().setPath( "./models/fbx/" );
 
-//Hand 1
-controllerGrip1 = renderer.xr.getControllerGrip( 0 );
-controllerGrip1.add( controllerModelFactory.createControllerModel( controllerGrip1 ) );
-scene.add( controllerGrip1 );
+  //Hand 1
+  controllerGrip1 = renderer.xr.getControllerGrip( 0 );
+  controllerGrip1.add( controllerModelFactory.createControllerModel( controllerGrip1 ) );
+  scene.add( controllerGrip1 );
 
-hand1 = renderer.xr.getHand( 0 );
-hand1.add( handModelFactory.createHandModel( hand1 ) );
+  hand1 = renderer.xr.getHand( 0 );
+  hand1.add( handModelFactory.createHandModel( hand1 ) );
 
-scene.add( hand1 );
+  scene.add( hand1 );
 
-//Hand 2
-controllerGrip2 = renderer.xr.getControllerGrip( 1 );
-controllerGrip2.add( controllerModelFactory.createControllerModel( controllerGrip2 ) );
-scene.add( controllerGrip2 ); 
+  //Hand 2
+  controllerGrip2 = renderer.xr.getControllerGrip( 1 );
+  controllerGrip2.add( controllerModelFactory.createControllerModel( controllerGrip2 ) );
+  scene.add( controllerGrip2 );
 
-hand2 = renderer.xr.getHand( 1 );
-hand2.add( handModelFactory.createHandModel( hand2 ) );
-scene.add( hand2 );
-//
+  hand2 = renderer.xr.getHand( 1 );
+  hand2.add( handModelFactory.createHandModel( hand2 ) );
+  scene.add( hand2 );
+  //
 
-const geometry = new THREE.BufferGeometry().setFromPoints( [ new THREE.Vector3( 0, 0, 0 ), new THREE.Vector3( 0, 0, - 1 ) ] );
+  const geometry = new THREE.BufferGeometry().setFromPoints( [ new THREE.Vector3( 0, 0, 0 ), new THREE.Vector3( 0, 0, - 1 ) ] );
 
-const line = new THREE.Line( geometry );
-line.name = 'line';
-line.scale.z = 5;
+  const line = new THREE.Line( geometry );
+  line.name = 'line';
+  line.scale.z = 5;
 
-controller1.add( line.clone() );
-controller2.add( line.clone() );
+  controller1.add( line.clone() );
+  controller2.add( line.clone() );
 
-raycaster = new THREE.Raycaster();
+  raycaster = new THREE.Raycaster();
+  pointRaycaster = new THREE.Raycaster();
+  pointRaycaster.params.Points.threshold = cellW / 2;
 
-//Dolly for camera
-dolly = new THREE.Group();
-dolly.position.set(0, 0, 0);
-dolly.name = "dolly";
-scene.add(dolly);
-dolly.add(camera);
-//add the controls to the dolly also or they will not move with the dolly
-dolly.add(controller1);
-dolly.add(controller2);
-dolly.add(controllerGrip1);
-dolly.add(controllerGrip2);
-//
+  //Dolly for camera
+  dolly = new THREE.Group();
+  dolly.position.set(0, 0, 0);
+  dolly.name = "dolly";
+  scene.add(dolly);
+  dolly.add(camera);
+  //add the controls to the dolly also or they will not move with the dolly
+  dolly.add(controller1);
+  dolly.add(controller2);
+  dolly.add(controllerGrip1);
+  dolly.add(controllerGrip2);
+  //
 
-group = new THREE.Group();
-scene.add(group);
+  group = new THREE.Group();
+  scene.add(group);
 
-//Geometries for testing
-    const geometries = [
+  //Geometries for testing
+  const geometries = [
     new THREE.BoxGeometry( 0.2, 0.2, 0.2 ),
     new THREE.ConeGeometry( 0.2, 0.2, 64 ),
     new THREE.CylinderGeometry( 0.2, 0.2, 0.2, 64 ),
@@ -360,99 +363,98 @@ const light = new THREE.DirectionalLight( 0xffffff );
   scene.add( light );
 //
 
-if (isXR) {
-document.body.appendChild( VRButton.createButton( renderer ) );
-renderer.xr.enabled = true;
-} else {
-controls = new THREE.OrbitControls(camera, renderer.domElement);
-}
+  if (isXR) {
+  document.body.appendChild( VRButton.createButton( renderer ) );
+  renderer.xr.enabled = true;
+  } else {
+  controls = new THREE.OrbitControls(camera, renderer.domElement);
+  }
 
-camera.position.set(256, 256, 256);
-camera.lookAt(new THREE.Vector3(0, 0, 0));
+  camera.position.set(256, 256, 256);
+  camera.lookAt(new THREE.Vector3(0, 0, 0));
 
-// var axesHelper = new THREE.AxesHelper( 4096 );
-// scene.add( axesHelper );
-//
-// var gridHelper = new THREE.GridHelper( 1024, 64 );
-// scene.add( gridHelper );
+  // var axesHelper = new THREE.AxesHelper( 4096 );
+  // scene.add( axesHelper );
+  //
+  // var gridHelper = new THREE.GridHelper( 1024, 64 );
+  // scene.add( gridHelper );
 
-//render();
-loadCollection();
+  //render();
+  loadCollection();
 
 
 
-window.addEventListener( 'resize', onWindowResize );
+  window.addEventListener( 'resize', onWindowResize );
 }
 
 function randomizePositions(){
-var positions = getRandomPositions(count, worldWidth);
-var translateDestArr = geometry.getAttribute('translateDest').array;
-for (var i=0; i<count; i++) {
-var i0 = i*3;
-translateDestArr[i0] = positions[i][0];
-translateDestArr[i0+1] = positions[i][1];
-translateDestArr[i0+2] = positions[i][2];
-}
-geometry.getAttribute('translateDest').needsUpdate = true;
+  var positions = getRandomPositions(count, worldWidth);
+  var translateDestArr = geometry.getAttribute('translateDest').array;
+  for (var i=0; i<count; i++) {
+    var i0 = i*3;
+    translateDestArr[i0] = positions[i][0];
+    translateDestArr[i0+1] = positions[i][1];
+    translateDestArr[i0+2] = positions[i][2];
+  }
+  geometry.getAttribute('translateDest').needsUpdate = true;
 
-transitionStart = new Date().getTime();
-transitionEnd = transitionStart + transitionDuration;
-isTransitioning = true;
+  transitionStart = new Date().getTime();
+  transitionEnd = transitionStart + transitionDuration;
+  isTransitioning = true;
 }
 
 function render(){
 
-if (isXR) {
-renderer.setAnimationLoop( function () {
-transition();
+  if (isXR) {
+    renderer.setAnimationLoop( function () {
+      transition();
 
-cleanIntersected();
+      cleanIntersected();
 
-intersectObjects( controller1 );
-intersectObjects( controller2 );
+      intersectObjects( controller1 );
+      intersectObjects( controller2 );
 
-//add gamepad polling for webxr to renderloop
-//dollyMove();
+      //add gamepad polling for webxr to renderloop
+      //dollyMove();
 
+      renderer.render( scene, camera );
+    });
 
-renderer.render( scene, camera );
-});
-
-} else {
-transition();
-renderer.render(scene, camera);
-controls.update();
-requestAnimationFrame(function(){
-render();
-});
-}
+  } else {
+    transition();
+    renderer.render(scene, camera);
+    controls.update();
+    requestAnimationFrame(function(){
+      render();
+    });
+  }
 };
 
 function transition(){
-if (!isTransitioning) return;
+  if (!isTransitioning) return;
 
-var now = new Date().getTime();
-var t = norm(now, transitionStart, transitionEnd);
+  var now = new Date().getTime();
+  var t = norm(now, transitionStart, transitionEnd);
 
-if (t >= 1) {
-isTransitioning = false;
-var translateArr = geometry.getAttribute('translate').array;
-var translateDestArr = geometry.getAttribute('translateDest').array;
-for (var i=0; i<count; i++) {
-var i0 = i*3;
-translateArr[i0] = translateDestArr[i0];
-translateArr[i0+1] = translateDestArr[i0+1]
-translateArr[i0+2] = translateDestArr[i0+2]
-}
-geometry.getAttribute('translate').needsUpdate = true;
-} else {
-t = ease(t);
-material.uniforms.positionTransitionPct.value = t;
-}
+  if (t >= 1) {
+    isTransitioning = false;
+    var translateArr = geometry.getAttribute('translate').array;
+    var translateDestArr = geometry.getAttribute('translateDest').array;
+    for (var i=0; i<count; i++) {
+      var i0 = i*3;
+      translateArr[i0] = translateDestArr[i0];
+      translateArr[i0+1] = translateDestArr[i0+1]
+      translateArr[i0+2] = translateDestArr[i0+2]
+    }
+    geometry.getAttribute('translate').needsUpdate = true;
+  } else {
+    t = ease(t);
+    material.uniforms.positionTransitionPct.value = t;
+  }
 }
 
 function animate() {
-renderer.setAnimationLoop( render );
+  renderer.setAnimationLoop( render );
 }
 
 //functions
