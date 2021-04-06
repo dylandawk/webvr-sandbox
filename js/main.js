@@ -23,8 +23,11 @@ var imageW = 4096;
 var imageH = 4096;
 var cellW = 16;
 var cellH = 16;
-var cols = parseInt(imageW / cellW);
-var rows = parseInt(imageH / cellH);
+var realW = 64;
+var realH = 64;
+var scale = cellW / realW;
+var cols = parseInt(imageW / realW);
+var rows = parseInt(imageH / realH);
 var cellCount = cols * rows;
 var transitionDuration = 4000;
 
@@ -72,6 +75,7 @@ precision mediump float;
 uniform float positionTransitionPct;
 
 attribute vec2 uvOffset;
+attribute vec3 scale;
 attribute vec3 translate;
 attribute vec3 translateDest;
 attribute vec3 actualSize;
@@ -90,7 +94,7 @@ if (pPct > 1.0) pPct = 1.0;
 vec3 p = mix( translate, translateDest, pPct );
 vec4 mvPosition = modelViewMatrix * vec4(p, 1.0);
 mvPosition.xyz += position * actualSize;
-vUv = uvOffset.xy + uv * actualSize.xy;
+vUv = uvOffset.xy + uv * actualSize.xy / scale.xy;
 
 vColor = color;
 
@@ -135,7 +139,7 @@ function loadControllers(){
   scene.add( controller2 );
 
   const controllerModelFactory = new XRControllerModelFactory();
-  const handModelFactory = new XRHandModelFactory().setPath( '../content/hand/' ); // "../node_modules/three/examples/models/fbx/" ); 
+  const handModelFactory = new XRHandModelFactory().setPath( '../content/hand/' ); // "../node_modules/three/examples/models/fbx/" );
 
   //Hand 1
   controllerGrip1 = renderer.xr.getControllerGrip( 0 );
@@ -150,7 +154,7 @@ function loadControllers(){
   //Hand 2
   controllerGrip2 = renderer.xr.getControllerGrip( 1 );
   controllerGrip2.add( controllerModelFactory.createControllerModel( controllerGrip2 ) );
-  scene.add( controllerGrip2 ); 
+  scene.add( controllerGrip2 );
 
   hand2 = renderer.xr.getHand( 1 );
   hand2.add( handModelFactory.createHandModel( hand2, "oculus" ) );
@@ -172,6 +176,7 @@ function loadCollection() {
   // define the shader attributes topology
   var attributes = [
     {name: 'uvOffset', size: 2},
+    {name: 'scale', size: 3},
     {name: 'translate', size: 3},
     {name: 'translateDest', size: 3},
     {name: 'actualSize', size: 3},
@@ -190,7 +195,7 @@ function loadCollection() {
   var yt = 1.0/cols;
   for (var i=0; i<count; i++) {
     var randomIndex = getRandomInt(0, cellCount-1);
-    var i0 = randomIndex*2;
+    var i0 = i*2;
     var y = parseInt(randomIndex / cols) / cols;
     var x = (randomIndex % cols) / cols;
     uvOffsetArr[i0] = x;
@@ -200,6 +205,7 @@ function loadCollection() {
   // set translates and colors
   var positions = getRandomPositions(count, worldWidth);
   var sizeArr = geometry.getAttribute('actualSize').array;
+  var scaleArr = geometry.getAttribute('scale').array;
   var translateArr = geometry.getAttribute('translate').array;
   var translateDestArr = geometry.getAttribute('translateDest').array;
   var colorArr = geometry.getAttribute('color').array;
@@ -208,6 +214,9 @@ function loadCollection() {
     sizeArr[i0] = cellW;
     sizeArr[i0+1] = cellH;
     sizeArr[i0+2] = 1;
+    scaleArr[i0] = scale;
+    scaleArr[i0+1] = scale;
+    scaleArr[i0+2] = 1;
     translateArr[i0] = positions[i][0];
     translateArr[i0+1] = positions[i][1];
     translateArr[i0+2] = positions[i][2];
@@ -350,19 +359,19 @@ function loadScene(){
   group = new THREE.Group();
   scene.add(group);
 
-  //for (var i=0; i< ITEM_NAMES.length; i++) {  
+  //for (var i=0; i< ITEM_NAMES.length; i++) {
     drawTestObjects(0);
 
   //}
-  
+
   //var object = group.getObjectByName( ITEM_NAMES[0]);
   //children[0].parent.position.x -= group.children.length*0.3;
 
 
   drawUI();
-  
-  group.position.y+=1;  
-  group.position.z-=2;  
+
+  group.position.y+=1;
+  group.position.z-=2;
   group.rotation.x = -0.55*Math.PI;
   group.rotation.z = Math.PI;
   group.scale.set(0.05,0.05,0.05); // scale here
@@ -523,12 +532,12 @@ function onSelectStart( event ) {
 
     controller.userData.selected = object;
 
-    console.log("SELECTED OBJECT:  " + object.name);  
+    console.log("SELECTED OBJECT:  " + object.name);
   }
 }
 
 function getContainerObjByChild(obj) {
-  
+
    if(obj.userData.isContainer) return obj
 
    else if(obj.parent != null) return getContainerObjByChild(obj.parent)
@@ -655,8 +664,8 @@ loader.load( ITEM_NAMES[index]+ '.gltf', function ( gltf ) {
   model.name = ITEM_NAMES[index]; // OR
   model.userData.isContainer = true;
   /*
-  model.position.y+=1;  
-  model.position.z-=2;  
+  model.position.y+=1;
+  model.position.z-=2;
   model.rotation.x = -0.55*Math.PI;
   model.rotation.z = Math.PI;
   model.scale.set(0.025,0.025,0.025); // scale here
@@ -666,10 +675,10 @@ loader.load( ITEM_NAMES[index]+ '.gltf', function ( gltf ) {
         if ( child.isMesh ) {
             child.geometry.center(); // center here
 
-            object = child; 
-            group.add( object ); 
-            console.log("group size: " + group.children.length);   
-            console.log("item 0's name?  " + group.children[0].parent.position.x); 
+            object = child;
+            group.add( object );
+            console.log("group size: " + group.children.length);
+            console.log("item 0's name?  " + group.children[0].parent.position.x);
         }
         if ( child.material ) child.material.metalness = 0.5;
     });
@@ -692,7 +701,7 @@ function drawTestGeoms() {
   ];
 
   for ( let i = 0; i < 20; i ++ ) {
-    const geometry = geometries[ Math.floor( Math.random() * geometries.length ) ];   
+    const geometry = geometries[ Math.floor( Math.random() * geometries.length ) ];
     const material = new THREE.MeshStandardMaterial( {
       color: Math.random() * 0xffffff,
       roughness: 0.7,
@@ -722,7 +731,7 @@ function drawUI() {
 
   var loader = new THREE.TextureLoader();
   var texture = loader.load( '../img/ui-bracelet.png' );
-  
+
   const geometry = new THREE.PlaneGeometry( 12*0.6, 17.18*0.6, 16 ); //new THREE.PlaneGeometry( 19, 12, 32 );
   const material = new THREE.MeshBasicMaterial( { map: texture, opacity: 0.8, transparent: true,  depthWrite: true, blending: THREE.NormalBlending } );
 
@@ -730,8 +739,8 @@ function drawUI() {
       map: texture,
       transparent: true,
       opacity: 0.8,
-      depthWrite: false, 
-      depthTest: false 
+      depthWrite: false,
+      depthTest: false
   });
 
   const plane = new THREE.Mesh( geometry, material );
