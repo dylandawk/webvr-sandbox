@@ -50,7 +50,7 @@ const intersected = [];
 const tempMatrix = new THREE.Matrix4();
 
 //model
-var model, objGroup;
+//var model;
 var objects = [];
 
 //object
@@ -135,7 +135,7 @@ function loadControllers(){
   scene.add( controller2 );
 
   const controllerModelFactory = new XRControllerModelFactory();
-  const handModelFactory = new XRHandModelFactory().setPath( "../node_modules/three/examples/models/fbx/" ); 
+  const handModelFactory = new XRHandModelFactory().setPath( '../content/hand/' ); // "../node_modules/three/examples/models/fbx/" ); 
 
   //Hand 1
   controllerGrip1 = renderer.xr.getControllerGrip( 0 );
@@ -350,14 +350,26 @@ function loadScene(){
   group = new THREE.Group();
   scene.add(group);
 
-  drawTestObjects();
+  //for (var i=0; i< ITEM_NAMES.length; i++) {  
+    drawTestObjects(0);
+
+  //}
+  
+  //var object = group.getObjectByName( ITEM_NAMES[0]);
+  //children[0].parent.position.x -= group.children.length*0.3;
+
+
   drawUI();
   
   group.position.y+=1;  
   group.position.z-=2;  
   group.rotation.x = -0.55*Math.PI;
   group.rotation.z = Math.PI;
-  group.scale.set(0.025,0.025,0.025); // scale here
+  group.scale.set(0.05,0.05,0.05); // scale here
+
+
+  //group.children[0].parent.position.x +=0.5;
+  //group.children[1].parent.position.x -=0.5;
 
 //Light
 const light = new THREE.DirectionalLight( 0xffffff );
@@ -369,10 +381,10 @@ const light = new THREE.DirectionalLight( 0xffffff );
   light.shadow.camera.left = - 2;
   light.shadow.mapSize.set( 4096, 4096 );
   scene.add( light );
-//
 
   var ambient = new THREE.AmbientLight( 0xffffff );
   scene.add(ambient);
+//
 
   if (isXR) {
   document.body.appendChild( VRButton.createButton( renderer ) );
@@ -419,7 +431,10 @@ function randomizePositions(){
 
 function rotateModel(){
   var timer = Date.now() * 0.0001;
-  if (model) model.rotation.z = 0.25*Math.PI + (Math.abs(Math.sin( timer )) * 4);
+
+  group.children.forEach( item => {
+    if (item) item.rotation.z = 0.25*Math.PI + (Math.abs(Math.sin( timer )) * 4);
+  });
 }
 
 function render(){
@@ -440,8 +455,6 @@ function render(){
       intersectPoints( controller2, 1 );
 
       //add gamepad polling for webxr to renderloop
-      //dollyMove();
-
       VRCameraControls(dolly, prevGamePads, speedFactor, camera, cameraVector, renderer);
 
       renderer.render( scene, camera );
@@ -632,41 +645,44 @@ function cleanIntersected() {
   }
 }
 
-var ITEM_NAMES = ['bracelet_cleaned.gltf', 'beardish.gltf'];
+var ITEM_NAMES = ['bracelet_cleaned', 'beardish_cleaned'];
 
-function drawTestObjects() {
+function drawTestObjects( index ) {
 
-const loader = new GLTFLoader().setPath( '../content/3d/' );
-loader.load( ITEM_NAMES[0], function ( gltf ) {
-  model = gltf.scene;
-  model.name = 'interactible'; // OR
+const loader = new GLTFLoader().setPath( '../content/haida/' );
+loader.load( ITEM_NAMES[index]+ '.gltf', function ( gltf ) {
+  var model = gltf.scene;
+  model.name = ITEM_NAMES[index]; // OR
   model.userData.isContainer = true;
-  
+  /*
   model.position.y+=1;  
   model.position.z-=2;  
   model.rotation.x = -0.55*Math.PI;
   model.rotation.z = Math.PI;
   model.scale.set(0.025,0.025,0.025); // scale here
+  */
 
   model.traverse( function ( child ) {
         if ( child.isMesh ) {
             child.geometry.center(); // center here
 
             object = child; 
-            group.add( object );     
+            group.add( object ); 
+            console.log("group size: " + group.children.length);   
+            console.log("item 0's name?  " + group.children[0].parent.position.x); 
         }
         if ( child.material ) child.material.metalness = 0.5;
     });
 
-  //objGroup.add( model );
+
   scene.add( model );
-  
-  //detectIntersections( controller1, raycaster, tempMatrix, model );
 
 }, (xhr) => xhr, ( err ) => console.error( e ));
 
+}
 
-/* Geometries for testing
+function drawTestGeoms() {
+// Geometries for testing
   const geometries = [
   new THREE.BoxGeometry( 0.2, 0.2, 0.2 ),
   new THREE.ConeGeometry( 0.2, 0.2, 64 ),
@@ -700,15 +716,14 @@ loader.load( ITEM_NAMES[0], function ( gltf ) {
 
     group.add( object );
   }
-  */
 }
 
 function drawUI() {
 
   var loader = new THREE.TextureLoader();
-  var texture = loader.load( '../img/ui-controls-solid.png' );
+  var texture = loader.load( '../img/ui-bracelet.png' );
   
-  const geometry = new THREE.PlaneGeometry( 19, 12, 32 );
+  const geometry = new THREE.PlaneGeometry( 12*0.6, 17.18*0.6, 16 ); //new THREE.PlaneGeometry( 19, 12, 32 );
   const material = new THREE.MeshBasicMaterial( { map: texture, opacity: 0.8, transparent: true,  depthWrite: true, blending: THREE.NormalBlending } );
 
   const UIMaterial = new THREE.SpriteMaterial({
