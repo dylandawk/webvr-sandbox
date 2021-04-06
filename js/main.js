@@ -36,8 +36,10 @@ var firstLoaded = false;
 var geometry, material;
 var pointGeo;
 var mesh;
-var transitionStart, transitionEnd;
+var transitionStart, transitionEnd, fadeStart, fadeEnd;
 var isTransitioning = false;
+var isFading = false;
+var itemPlane;
 
 //controllers & Hands
 var controller1, controller2;
@@ -73,8 +75,11 @@ var MaterialVertexShader = `
 precision mediump float;
 
 uniform float positionTransitionPct;
+uniform float alphaTransitionPct;
 
 attribute vec2 uvOffset;
+attribute float alpha;
+attribute float alphaDest;
 attribute vec3 scale;
 attribute vec3 translate;
 attribute vec3 translateDest;
@@ -96,6 +101,15 @@ vec4 mvPosition = modelViewMatrix * vec4(p, 1.0);
 mvPosition.xyz += position * actualSize;
 vUv = uvOffset.xy + uv * actualSize.xy / scale.xy;
 
+float aPct = alphaTransitionPct;
+if (aPct > 1.0) aPct = 1.0;
+vAlpha = (alphaDest-alpha) * aPct + alpha;
+
+// move the point far away if alpha zero
+if (vAlpha <= 0.0) {
+  p = vec3(-999999., -999999., -999999.);
+}
+
 vColor = color;
 
 gl_Position = projectionMatrix * mvPosition;
@@ -111,6 +125,7 @@ uniform float fogDistance;
 
 varying vec2 vUv;
 varying vec3 vColor;
+varying float vAlpha;
 
 void main() {
 if( length( vColor ) < .1 )discard;
@@ -123,7 +138,7 @@ if( d >= 1. ) discard;
 vec4 diffuseColor = texture2D(map, vUv);
 gl_FragColor = diffuseColor * vec4(vColor, 1.0);
 gl_FragColor.rgb = mix( gl_FragColor.rgb, fogColor, d );
-gl_FragColor.a = 1.;
+gl_FragColor.a = vAlpha;
 }
 `;
 
@@ -179,6 +194,8 @@ function loadCollection() {
     {name: 'scale', size: 3},
     {name: 'translate', size: 3},
     {name: 'translateDest', size: 3},
+    {name: 'alpha', size: 1},
+    {name: 'alphaDest', size: 1},
     {name: 'actualSize', size: 3},
     {name: 'color', size: 3}
   ];
@@ -188,6 +205,14 @@ function loadCollection() {
     var buffAttr = new THREE.InstancedBufferAttribute(buffer, attr.size, false, 1);
     buffAttr.setUsage(THREE.DynamicDrawUsage);
     geometry.setAttribute(attr.name, buffAttr);
+  }
+
+  // set alpha
+  var alphaArr = geometry.getAttribute('alpha').array;
+  var alphaDestArr = geometry.getAttribute('alphaDest').array;
+  for (var i=0; i<count; i++) {
+    alphaArr[i] = 0;
+    alphaDestArr[i] = 0;
   }
 
   // set uv offset to random cell
@@ -253,6 +278,7 @@ function loadCollection() {
     uniforms: {
       map: {type: "t", value: texture },
       positionTransitionPct: {type: "f", value: 0.0},
+      alphaTransitionPct: {type: "f", value: 0.0},
       ///fog
       fogColor: {type: "v3", value: new THREE.Vector3()},
       fogDistance: {type: "f", value: 5000}
@@ -264,6 +290,7 @@ function loadCollection() {
     transparent: true
     });
     material.uniforms.positionTransitionPct.value = 1.0;
+    material.uniforms.alphaTransitionPct.value = 0.0;
 
     mesh = new THREE.Mesh(geometry, material);
     mesh.frustumCulled = false;
@@ -276,8 +303,59 @@ function loadCollection() {
     // done loading scene
     $('.loading').removeClass('active');
     loadListeners();
+    fadeInCollection();
     render();
   });
+}
+
+function fadeCollection(fromAlpha, toAlpha, duration) {
+  duration = duration || 2000;
+  var alphaArr = geometry.getAttribute('alpha').array;
+  var alphaDestArr = geometry.getAttribute('alphaDest').array;
+
+  for (var i=0; i<count; i++) {
+    alphaArr[i] = fromAlpha;
+    alphaDestArr[i] = toAlpha;
+  }
+
+  geometry.getAttribute('alpha').needsUpdate = true;
+  geometry.getAttribute('alphaDest').needsUpdate = true;
+
+  material.uniforms.alphaTransitionPct.value = 0.0;
+  fadeStart = new Date().getTime();
+  fadeEnd = fadeStart + duration;
+
+  isFading = true;
+}
+
+function fadeInCollection(duration){
+  console.log("Fade in.");
+  fadeCollection(0, 1, duration);
+}
+
+function fadeOutCollection(duration){
+  console.log("Fade out.");
+  fadeCollection(1, 0, duration);
+}
+
+function fade(){
+  if (!isFading) return;
+
+  var now = new Date().getTime();
+  var t = norm(now, fadeStart, fadeEnd);
+
+  if (t >= 1) {
+    isFading = false;
+    var alphaArr = geometry.getAttribute('alpha').array;
+    var alphaDestArr = geometry.getAttribute('alphaDest').array;
+    for (var i=0; i<count; i++) {
+      alphaArr[i] = alphaDestArr[i];
+    }
+    geometry.getAttribute('alpha').needsUpdate = true;
+  } else {
+    t = ease(t);
+    material.uniforms.alphaTransitionPct.value = t;
+  }
 }
 
 function loadListeners(){
@@ -454,6 +532,7 @@ function render(){
       //rotateModel();
 
       transition();
+      fade();
 
       cleanIntersected();
 
@@ -471,6 +550,7 @@ function render(){
 
   } else {
     transition();
+    fade();
     renderer.render(scene, camera);
     controls.update();
     intersectFromCursor();
@@ -533,6 +613,8 @@ function onSelectStart( event ) {
     controller.userData.selected = object;
 
     console.log("SELECTED OBJECT:  " + object.name);
+  } else {
+    onUserSelect();
   }
 }
 
@@ -612,8 +694,8 @@ function intersectPoints( controller, index ){
     var x = pointPosArr[ 3 * index ];
     var y = pointPosArr[ 3 * index + 1 ];
     var z = pointPosArr[ 3 * index + 2 ];
-    highlighter1.position.set(x, y, z);
-    highlighter1.visible = true;
+    highlighter.position.set(x, y, z);
+    if (!itemPlane.visible) highlighter.visible = true;
 
   }
 }
@@ -625,6 +707,26 @@ function onDocumentMouseMove( event ) {
   mouse.y = - ( event.clientY / window.innerHeight ) * 2 + 1;
 }
 document.addEventListener( 'mousemove', onDocumentMouseMove, false );
+
+function onUserSelect( event ) {
+  if (itemPlane.visible) {
+    itemPlane.visible = false;
+    fadeInCollection();
+  } else {
+    if (highlighter1.visible) {
+      itemPlane.position.copy(highlighter1.position);
+      fadeOutCollection();
+      itemPlane.visible = true;
+      highlighter1.visible = false;
+    } else if (highlighter2.visible) {
+      itemPlane.position.copy(highlighter2.position);
+      fadeOutCollection();
+      itemPlane.visible = true;
+      highlighter2.visible = false;
+    }
+  }
+}
+document.addEventListener( 'click', onUserSelect, false );
 
 function intersectFromCursor(){
   pointRaycaster.setFromCamera( mouse, camera );
@@ -638,7 +740,7 @@ function intersectFromCursor(){
     var y = pointPosArr[ 3 * index + 1 ];
     var z = pointPosArr[ 3 * index + 2 ];
     highlighter1.position.set(x, y, z);
-    highlighter1.visible = true;
+    if (!itemPlane.visible) highlighter1.visible = true;
   } else {
     highlighter1.visible = false;
   }
@@ -738,15 +840,16 @@ function drawUI() {
   const UIMaterial = new THREE.SpriteMaterial({
       map: texture,
       transparent: true,
-      opacity: 0.8,
+      opacity: 0.1,
       depthWrite: false,
       depthTest: false
   });
 
-  const plane = new THREE.Mesh( geometry, material );
-  plane.position.set(0, 0, camera.position.z -10); //plane.position.z = camera.position.z -30;
-  plane.quaternion.copy( camera.quaternion );
-  scene.add( plane );
+  itemPlane = new THREE.Mesh( geometry, material );
+  itemPlane.position.set(0, 0, camera.position.z -10); //plane.position.z = camera.position.z -30;
+  itemPlane.quaternion.copy( camera.quaternion );
+  itemPlane.visible = false;
+  scene.add( itemPlane );
   /*
   const label = new THREE.Sprite(UIMaterial);
   label.position.set(3, 3, camera.position.z -5);
