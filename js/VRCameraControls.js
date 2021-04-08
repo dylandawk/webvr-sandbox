@@ -34,7 +34,7 @@ function VRCameraControls(dolly, prevGamePads, speedFactor, camera, cameraVector
             if (data.handedness == "left") {
               console.log("Left Paddle Down - Pressing");
               if (i == 1) {
-                dolly.rotateY(-THREE.Math.degToRad(1));
+                //dolly.rotateY(-THREE.Math.degToRad(1));
               }
               if (i == 3) {
                 //reset teleport to home position
@@ -47,7 +47,7 @@ function VRCameraControls(dolly, prevGamePads, speedFactor, camera, cameraVector
 
               // detectIntersections( controller );
               if (i == 1) {
-                dolly.rotateY(THREE.Math.degToRad(1));
+                //dolly.rotateY(THREE.Math.degToRad(1));
               }
             }
           } else {
@@ -57,10 +57,10 @@ function VRCameraControls(dolly, prevGamePads, speedFactor, camera, cameraVector
               //use the paddle buttons to rotate
               if (data.handedness == "left") {
                 console.log("Left Paddle Down - Releasing");
-                dolly.rotateY(-THREE.Math.degToRad(Math.abs(value)));
+                //dolly.rotateY(-THREE.Math.degToRad(Math.abs(value)));
               } else {
                 console.log("Right Paddle Down - Releasing");
-                dolly.rotateY(THREE.Math.degToRad(Math.abs(value)));
+                //dolly.rotateY(THREE.Math.degToRad(Math.abs(value)));
               }
             }
           }

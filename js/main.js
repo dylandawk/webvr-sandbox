@@ -3,9 +3,10 @@
 import { XRControllerModelFactory } from '../node_modules/three/examples/jsm/webxr/XRControllerModelFactory.js';
 import { XRHandModelFactory } from '../node_modules/three/examples/jsm/webxr/XRHandModelFactory.js';
 import { GLTFLoader } from '../node_modules/three/examples/jsm/loaders/GLTFLoader.js';
+import { TWEEN } from '../node_modules/three/examples/jsm/libs/tween.module.min.js';
 
 // get count from URL
-var count = 10000;
+var count = 15000;
 var q = getQueryParams();
 if (q.count) count = parseInt(q.count);
 $('#input-count').val(count);
@@ -31,7 +32,7 @@ var rows = parseInt(imageH / realH);
 var cellCount = cols * rows;
 var transitionDuration = 4000;
 
-var $el, w, h, scene, camera, renderer, controls, group;
+var $el, $cl, w, h, scene, camera, renderer, controls, group, uiGroup;
 var firstLoaded = false;
 var geometry, material;
 var pointGeo;
@@ -39,7 +40,7 @@ var mesh;
 var transitionStart, transitionEnd, fadeStart, fadeEnd;
 var isTransitioning = false;
 var isFading = false;
-var itemPlane;
+var itemPlane, mediaBttn;
 
 //controllers & Hands
 var controller1, controller2;
@@ -60,6 +61,7 @@ var objects = [];
 
 //object
 var object = new THREE.Object3D();
+var meshobj = new THREE.Object3D();
 
 //Camera move
 var dolly;
@@ -308,18 +310,18 @@ function loadCollection() {
   });
 }
 
-function fadeCollection(fromAlpha, toAlpha, duration) {
+function fadeCollection(target, fromAlpha, toAlpha, duration) {
   duration = duration || 2000;
-  var alphaArr = geometry.getAttribute('alpha').array;
-  var alphaDestArr = geometry.getAttribute('alphaDest').array;
+  var alphaArr = target.getAttribute('alpha').array;
+  var alphaDestArr = target.getAttribute('alphaDest').array;
 
   for (var i=0; i<count; i++) {
     alphaArr[i] = fromAlpha;
     alphaDestArr[i] = toAlpha;
   }
 
-  geometry.getAttribute('alpha').needsUpdate = true;
-  geometry.getAttribute('alphaDest').needsUpdate = true;
+  target.getAttribute('alpha').needsUpdate = true;
+  target.getAttribute('alphaDest').needsUpdate = true;
 
   material.uniforms.alphaTransitionPct.value = 0.0;
   fadeStart = new Date().getTime();
@@ -330,15 +332,15 @@ function fadeCollection(fromAlpha, toAlpha, duration) {
 
 function fadeInCollection(duration){
   console.log("Fade in.");
-  fadeCollection(0, 1, duration);
+  fadeCollection(geometry, 0.3, 1, duration);
 }
 
 function fadeOutCollection(duration){
   console.log("Fade out.");
-  fadeCollection(1, 0, duration);
+  fadeCollection(geometry, 1, 0.3, duration);
 }
 
-function fade(){
+function fade(target){
   if (!isFading) return;
 
   var now = new Date().getTime();
@@ -346,12 +348,12 @@ function fade(){
 
   if (t >= 1) {
     isFading = false;
-    var alphaArr = geometry.getAttribute('alpha').array;
-    var alphaDestArr = geometry.getAttribute('alphaDest').array;
+    var alphaArr = target.getAttribute('alpha').array;
+    var alphaDestArr = target.getAttribute('alphaDest').array;
     for (var i=0; i<count; i++) {
       alphaArr[i] = alphaDestArr[i];
     }
-    geometry.getAttribute('alpha').needsUpdate = true;
+    target.getAttribute('alpha').needsUpdate = true;
   } else {
     t = ease(t);
     material.uniforms.alphaTransitionPct.value = t;
@@ -408,10 +410,11 @@ function loadScene(){
   pointRaycaster = new THREE.Raycaster();
   pointRaycaster.params.Points.threshold = cellW / 2;
   pointRaycaster.layers.set( 7 );
-  const highlightGeo1 = new THREE.SphereGeometry( 16, 32, 32 );
-  const highlightGeo2 = new THREE.SphereGeometry( 16, 32, 32 );
-  const highlightMat1 = new THREE.MeshBasicMaterial( {color: 0x00ff00, transparent: true} );
-  const highlightMat2 = new THREE.MeshBasicMaterial( {color: 0xff0000, transparent: true} );
+  
+  const highlightGeo1 = new THREE.RingGeometry( 16, 16+5, 32 );
+  const highlightGeo2 = new THREE.RingGeometry( 16, 16+5, 32 );
+  const highlightMat1 = new THREE.MeshBasicMaterial( {color: 0x91eff0, transparent: true} ); //0x00ff00
+  const highlightMat2 = new THREE.MeshBasicMaterial( {color: 0x91eff0, transparent: true} ); //0xff0000
   highlighter1 = new THREE.Mesh( highlightGeo1, highlightMat1 );
   highlighter1.opacity = 0.5;
   highlighter1.visible = false;
@@ -420,6 +423,9 @@ function loadScene(){
   highlighter2.visible = false;
   scene.add( highlighter1 );
   scene.add( highlighter2 );
+
+  //HIGHLIGHTER CLONES FOR MANIPULATION
+  highlighter1.CL
 
   //Dolly for camera
   dolly = new THREE.Group();
@@ -432,19 +438,20 @@ function loadScene(){
   dolly.add(controller2);
   dolly.add(controllerGrip1);
   dolly.add(controllerGrip2);
+
+  dolly.add(hand1);
+  dolly.add(hand2);
   //
 
   group = new THREE.Group();
   scene.add(group);
 
+  uiGroup = new THREE.Group();
+  scene.add(uiGroup);
+
   //for (var i=0; i< ITEM_NAMES.length; i++) {
     drawTestObjects(0);
-
   //}
-
-  //var object = group.getObjectByName( ITEM_NAMES[0]);
-  //children[0].parent.position.x -= group.children.length*0.3;
-
 
   drawUI();
 
@@ -453,10 +460,6 @@ function loadScene(){
   group.rotation.x = -0.55*Math.PI;
   group.rotation.z = Math.PI;
   group.scale.set(0.05,0.05,0.05); // scale here
-
-
-  //group.children[0].parent.position.x +=0.5;
-  //group.children[1].parent.position.x -=0.5;
 
 //Light
 const light = new THREE.DirectionalLight( 0xffffff );
@@ -474,7 +477,7 @@ const light = new THREE.DirectionalLight( 0xffffff );
 //
 
   if (isXR) {
-  document.body.appendChild( VRButton.createButton( renderer ) );
+  $('.intro-buttons').append( VRButton.createButton( renderer ) );
   renderer.xr.enabled = true;
   } else {
   controls = new THREE.OrbitControls(camera, renderer.domElement);
@@ -483,13 +486,6 @@ const light = new THREE.DirectionalLight( 0xffffff );
   camera.position.set(256, 256, 256);
   camera.lookAt(new THREE.Vector3(0, 0, 0));
 
-  // var axesHelper = new THREE.AxesHelper( 4096 );
-  // scene.add( axesHelper );
-  //
-  // var gridHelper = new THREE.GridHelper( 1024, 64 );
-  // scene.add( gridHelper );
-
-  //render();
   loadCollection();
 
   window.addEventListener( 'resize', onWindowResize );
@@ -524,16 +520,27 @@ function rotateModel(){
   });
 }
 
+function update(){
+  TWEEN.update();
+
+  highlighter1.quaternion.copy( camera.quaternion );
+  highlighter2.quaternion.copy( camera.quaternion );
+
+  //add gamepad polling for webxr to renderloop
+  VRCameraControls(dolly, prevGamePads, speedFactor, camera, cameraVector, renderer);     
+}
+
 function render(){
 
   if (isXR) {
       renderer.setAnimationLoop( function () {
-
       //rotateModel();
 
       transition();
-      fade();
+      fade(geometry);
 
+      update();
+          
       cleanIntersected();
 
       intersectObjects( controller1 );
@@ -541,9 +548,6 @@ function render(){
 
       intersectPoints( controller1, 0 );
       intersectPoints( controller2, 1 );
-
-      //add gamepad polling for webxr to renderloop
-      VRCameraControls(dolly, prevGamePads, speedFactor, camera, cameraVector, renderer);
 
       renderer.render( scene, camera );
     });
@@ -584,6 +588,7 @@ function transition(){
 }
 
 function animate() {
+  //update();
   renderer.setAnimationLoop( render );
 }
 
@@ -609,10 +614,10 @@ function onSelectStart( event ) {
     const object = intersection.object;
     object.material.emissive.b = 0.2;
     controller.attach( object );
-
     controller.userData.selected = object;
+    //object.callback();
 
-    console.log("SELECTED OBJECT:  " + object.name);
+    console.log("Selected 3D object:  " + object.name);
   } else {
     onUserSelect();
   }
@@ -651,7 +656,7 @@ function getIntersections( controller, targetObjects, theRaycaster ) {
   theRaycaster.ray.origin.setFromMatrixPosition( controller.matrixWorld );
   theRaycaster.ray.direction.set( 0, 0, - 1 ).applyMatrix4( tempMatrix );
 
-  targetObjects = targetObjects || group.children;
+  targetObjects = targetObjects || group.children || uiGroup.children ;
   return theRaycaster.intersectObjects( targetObjects );
 }
 
@@ -671,6 +676,8 @@ function intersectObjects( controller ) {
     const object = intersection.object;
     object.material.emissive.r = 0.2;
     intersected.push( object );
+
+    console.log("intersecting with ...  " + object.name);
 
     line.scale.z = intersection.distance;
 
@@ -695,18 +702,45 @@ function intersectPoints( controller, index ){
     var y = pointPosArr[ 3 * index + 1 ];
     var z = pointPosArr[ 3 * index + 2 ];
     highlighter.position.set(x, y, z);
-    if (!itemPlane.visible) highlighter.visible = true;
-
+    //if (!itemPlane.visible) 
+      highlighter.visible = true;
   }
 }
 
 var mouse = new THREE.Vector2();
+
 function onDocumentMouseMove( event ) {
   event.preventDefault();
   mouse.x = ( event.clientX / window.innerWidth ) * 2 - 1;
   mouse.y = - ( event.clientY / window.innerHeight ) * 2 + 1;
 }
 document.addEventListener( 'mousemove', onDocumentMouseMove, false );
+
+var dist = 20; 
+var cwd = new THREE.Vector3();
+
+function flyToUser(highlighter, targetObj) {
+
+  targetObj.setRotationFromQuaternion(camera.quaternion);
+
+  camera.getWorldDirection(cwd);
+  cwd.multiplyScalar(dist);
+  cwd.add(camera.position);
+ 
+  new TWEEN.Tween(targetObj.position)
+      .to(cwd, 2000)
+      .easing(TWEEN.Easing.Cubic.Out)
+      .onUpdate(() => render())//this line is unnecessary if you are re-rendering within the animation loop 
+      .start()
+      .onComplete(function() { 
+        console.log("tween complete");
+
+        /*setTimeout( function() {
+          onUserSelect();
+        }, 10000 );*/
+        
+      });
+}
 
 function onUserSelect( event ) {
   if (itemPlane.visible) {
@@ -718,14 +752,20 @@ function onUserSelect( event ) {
       fadeOutCollection();
       itemPlane.visible = true;
       highlighter1.visible = false;
+
+      flyToUser(highlighter1, itemPlane);
+
     } else if (highlighter2.visible) {
       itemPlane.position.copy(highlighter2.position);
       fadeOutCollection();
       itemPlane.visible = true;
       highlighter2.visible = false;
+
+      flyToUser(highlighter2, itemPlane);
     }
   }
 }
+
 document.addEventListener( 'click', onUserSelect, false );
 
 function intersectFromCursor(){
@@ -747,7 +787,6 @@ function intersectFromCursor(){
 }
 
 function cleanIntersected() {
-
   while ( intersected.length ) {
 
     const object = intersected.pop();
@@ -770,7 +809,6 @@ loader.load( ITEM_NAMES[index]+ '.gltf', function ( gltf ) {
   model.position.z-=2;
   model.rotation.x = -0.55*Math.PI;
   model.rotation.z = Math.PI;
-  model.scale.set(0.025,0.025,0.025); // scale here
   */
 
   model.traverse( function ( child ) {
@@ -779,15 +817,15 @@ loader.load( ITEM_NAMES[index]+ '.gltf', function ( gltf ) {
 
             object = child;
             group.add( object );
-            console.log("group size: " + group.children.length);
-            console.log("item 0's name?  " + group.children[0].parent.position.x);
+            //console.log("group size: " + group.children.length);
+            //console.log("item 0's name?  " + group.children[0].parent.position.x);
         }
         if ( child.material ) child.material.metalness = 0.5;
     });
 
+  //object.callback = function() { console.log( this.name ); }
 
   scene.add( model );
-
 }, (xhr) => xhr, ( err ) => console.error( e ));
 
 }
@@ -834,40 +872,52 @@ function drawUI() {
   var loader = new THREE.TextureLoader();
   var texture = loader.load( '../img/ui-bracelet.png' );
 
-  const geometry = new THREE.PlaneGeometry( 12*0.6, 17.18*0.6, 16 ); //new THREE.PlaneGeometry( 19, 12, 32 );
-  const material = new THREE.MeshBasicMaterial( { map: texture, opacity: 0.8, transparent: true,  depthWrite: true, blending: THREE.NormalBlending } );
+  const geometry = new THREE.PlaneGeometry( 12*0.6, 17.18*0.6, 16 ); 
+  const material = new THREE.MeshBasicMaterial( { 
+    map: texture, 
+    opacity: 1.0, 
+    transparent: true,  
+    depthWrite: true, 
+    blending: THREE.NormalBlending 
+  } );
 
   const UIMaterial = new THREE.SpriteMaterial({
-      map: texture,
+      //map: texture,
+      color: '#69f',
       transparent: true,
-      opacity: 0.1,
+      opacity: 0.5,
       depthWrite: false,
       depthTest: false
   });
 
   itemPlane = new THREE.Mesh( geometry, material );
-  itemPlane.position.set(0, 0, camera.position.z -10); //plane.position.z = camera.position.z -30;
+  itemPlane.position.copy(camera.position); 
   itemPlane.quaternion.copy( camera.quaternion );
   itemPlane.visible = false;
   scene.add( itemPlane );
-  /*
-  const label = new THREE.Sprite(UIMaterial);
-  label.position.set(3, 3, camera.position.z -5);
-  label.width = 40;
-  label.height = 24;
-  label.quaternion.copy( camera.quaternion );
-  scene.add( label );
+  // meshobj.add(itemPlane);
+  // uiGroup.add( meshobj );
 
+ /*
+  mediaBttn = new THREE.Sprite(UIMaterial);
+  mediaBttn.position.set(3, 3, camera.position.z -5);
+  mediaBttn.width = 40;
+  mediaBttn.height = 24;
+  mediaBttn.quaternion.copy( camera.quaternion );
+  scene.add( mediaBttn );
+  group.add( mediaBttn );
+ */
   var testGeo = new THREE.PlaneBufferGeometry();
   var testMat = new THREE.MeshBasicMaterial( { map: texture, opacity: 0.8, transparent: true,  depthWrite: false, depthTest: false  } );
 
-  var testMesh = new THREE.Mesh( testGeo, testMat );
-  testMesh.position.set(-3, 3, camera.position.z -5);
+  const testMesh = new THREE.Mesh( testGeo, testMat );
+  testMesh.position.set(2, 2, camera.position.z -5);
   testMesh.quaternion.copy( camera.quaternion );
   testMesh.width = 80;
   testMesh.height = 48;
   scene.add( testMesh );
-  */
+  //meshobj.add(testMesh);
+  uiGroup.add( testMesh );
 }
 
 

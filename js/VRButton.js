@@ -41,7 +41,7 @@ class VRButton {
 
 			button.style.cursor = 'pointer';
 			button.style.left = 'calc(50% - 50px)';
-			button.style.width = '100px';
+			button.style.width = '200px';
 
 			button.textContent = 'ENTER VR';
 
@@ -71,6 +71,8 @@ class VRButton {
 					const sessionInit = { optionalFeatures: [ 'local-floor', 'bounded-floor', 'hand-tracking' ] };
 					navigator.xr.requestSession( 'immersive-vr', sessionInit ).then( onSessionStarted );
 
+					//document.$app.removeClass('intro');
+					$('.intro').remove();
 				} else {
 
 					currentSession.end();
@@ -87,7 +89,7 @@ class VRButton {
 
 			button.style.cursor = 'auto';
 			button.style.left = 'calc(50% - 75px)';
-			button.style.width = '150px';
+			button.style.width = '250px';
 
 			button.onmouseenter = null;
 			button.onmouseleave = null;
@@ -106,14 +108,14 @@ class VRButton {
 
 		function stylizeElement( element ) {
 
-			element.style.position = 'absolute';
-			element.style.bottom = '20px';
-			element.style.padding = '12px 6px';
+			//element.style.position = 'absolute';
+			//element.style.bottom = '20px';
+			element.style.padding = '14px 8px';
 			element.style.border = '1px solid #fff';
 			element.style.borderRadius = '4px';
 			element.style.background = 'rgba(0,0,0,0.1)';
 			element.style.color = '#fff';
-			element.style.font = 'normal 13px sans-serif';
+			element.style.font = 'normal 22px sans-serif';
 			element.style.textAlign = 'center';
 			element.style.opacity = '0.5';
 			element.style.outline = 'none';
