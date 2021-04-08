@@ -410,16 +410,65 @@ function loadScene(){
   pointRaycaster = new THREE.Raycaster();
   pointRaycaster.params.Points.threshold = cellW / 2;
   pointRaycaster.layers.set( 7 );
+
+  // shader code for highlighter
+  function vertexShader() {
+    return `
+      uniform vec3 viewVector;
+      uniform float c;
+      uniform float p;
+      varying float intensity;
+      void main()
+      {
+        vec3 vNormal = normalize( normalMatrix * normal );
+        vec3 vNormel = normalize( normalMatrix * viewVector );
+        intensity = pow( c - dot(vNormal, vNormel), p );
+      
+        gl_Position = projectionMatrix * modelViewMatrix * vec4( position, 1.0 );
+      }
+    `
+  }
+  function fragmentShader(){
+    return `
+      uniform vec3 glowColor;
+      varying float intensity;
+      void main()
+      {
+        vec3 glow = glowColor * intensity;
+        gl_FragColor = vec4( glow, 1.0 );
+      }
+    `
+  }
+  let viewVector = new THREE.Vector3(camera.position.x, camera.position.y, camera.position.z + 1.0)
+  let uniforms = {
+    c:   { type: "f", value: 1.0 },
+    p:   { type: "f", value: 1.4 },
+    glowColor: { type: "vec3", value: new THREE.Color(0x00ffff) },
+    viewVector: { type: "vec3", value: viewVector }
+  }
+  var hLMaterial = new THREE.ShaderMaterial(
+    {
+        uniforms: uniforms,
+        vertexShader: vertexShader(),
+        fragmentShader: fragmentShader(),
+        side: THREE.FrontSide,
+        blending: THREE.AdditiveBlending,
+        transparent: true
+    }   );
+
+  var hLGeometry = new THREE.SphereGeometry(15, 32,32);
   
-  const highlightGeo1 = new THREE.RingGeometry( 16, 16+5, 32 );
-  const highlightGeo2 = new THREE.RingGeometry( 16, 16+5, 32 );
-  const highlightMat1 = new THREE.MeshBasicMaterial( {color: 0x91eff0, transparent: true} ); //0x00ff00
-  const highlightMat2 = new THREE.MeshBasicMaterial( {color: 0x91eff0, transparent: true} ); //0xff0000
-  highlighter1 = new THREE.Mesh( highlightGeo1, highlightMat1 );
-  highlighter1.opacity = 0.5;
+  // const highlightGeo1 = new THREE.RingGeometry( 16, 16+5, 32 );
+  // const highlightGeo2 = new THREE.RingGeometry( 16, 16+5, 32 );
+  // const highlightMat1 = new THREE.MeshBasicMaterial( {color: 0x91eff0, transparent: true} ); //0x00ff00
+  // const highlightMat2 = new THREE.MeshBasicMaterial( {color: 0x91eff0, transparent: true} ); //0xff0000
+  //highlighter1 = new THREE.Mesh( highlightGeo1, highlightMat1 );
+  //highlighter1.opacity = 0.5;
+  //highlighter2 = new THREE.Mesh( highlightGeo2, highlightMat2 );
+  // highlighter2.opacity = 0.5;
+  highlighter1 = new THREE.Mesh( hLGeometry, hLMaterial );
   highlighter1.visible = false;
-  highlighter2 = new THREE.Mesh( highlightGeo2, highlightMat2 );
-  highlighter2.opacity = 0.5;
+  highlighter2 = new THREE.Mesh( hLGeometry, hLMaterial );
   highlighter2.visible = false;
   scene.add( highlighter1 );
   scene.add( highlighter2 );
@@ -589,6 +638,7 @@ function transition(){
 
 function animate() {
   //update();
+  console.log(animate);
   renderer.setAnimationLoop( render );
 }
 
