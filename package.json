@@ -5,9 +5,7 @@
     "start": "node server.js"
   },
   "devDependencies": {
-    "express": "^4.17.1"
-  },
-  "dependencies": {
+    "express": "^4.17.1",
     "three": "^0.127.0"
   }
 }
