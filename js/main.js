@@ -32,7 +32,7 @@ var rows = parseInt(imageH / realH);
 var cellCount = cols * rows;
 var transitionDuration = 4000;
 
-var $el, $cl, w, h, scene, camera, renderer, controls, group, uiGroup;
+var $el, $cl, w, h, scene, camera, renderer, controls, group, uiGroup, itemArray;
 var firstLoaded = false;
 var geometry, material;
 var pointGeo;
@@ -41,6 +41,7 @@ var transitionStart, transitionEnd, fadeStart, fadeEnd;
 var isTransitioning = false;
 var isFading = false;
 var itemPlane, mediaBttn;
+var IMAGE_NAMES =[];
 
 //controllers & Hands
 var controller1, controller2;
@@ -439,7 +440,7 @@ function loadScene(){
       }
     `
   }
-  let viewVector = new THREE.Vector3(camera.position.x, camera.position.y, camera.position.z + 1.0)
+  let viewVector = new THREE.Vector3(camera.position.x, camera.position.y, camera.position.z + 1.0);
   let uniforms = {
     c:   { type: "f", value: 1.0 },
     p:   { type: "f", value: 1.4 },
@@ -510,8 +511,8 @@ function loadScene(){
   group.rotation.z = Math.PI;
   group.scale.set(0.05,0.05,0.05); // scale here
 
-//Light
-const light = new THREE.DirectionalLight( 0xffffff );
+  //Light
+  const light = new THREE.DirectionalLight( 0xffffff );
   light.position.set( 0, 6, 0 );
   light.castShadow = false;
   light.shadow.camera.top = 2;
@@ -523,7 +524,7 @@ const light = new THREE.DirectionalLight( 0xffffff );
 
   var ambient = new THREE.AmbientLight( 0xffffff );
   scene.add(ambient);
-//
+  //
 
   if (isXR) {
   $('.intro-buttons').append( VRButton.createButton( renderer ) );
@@ -574,6 +575,9 @@ function update(){
 
   highlighter1.quaternion.copy( camera.quaternion );
   highlighter2.quaternion.copy( camera.quaternion );
+  // let viewVector = new THREE.Vector3(camera.position.x, camera.position.y, camera.position.z + 1.0);
+  // highlighter1.material.uniforms.viewVector.value = new THREE.Vector3().subVectors(viewVector, highlighter1.position);
+  // highlighter2.material.uniforms.viewVector.value = new THREE.Vector3().subVectors(viewVector, highlighter2.position);
 
   //add gamepad polling for webxr to renderloop
   VRCameraControls(dolly, prevGamePads, speedFactor, camera, cameraVector, renderer);     
@@ -776,6 +780,7 @@ function flyToUser(highlighter, targetObj) {
   camera.getWorldDirection(cwd);
   cwd.multiplyScalar(dist);
   cwd.add(camera.position);
+  console.log(`target object postition ${targetObj.position} camera world direction: ${cwd}`)
  
   new TWEEN.Tween(targetObj.position)
       .to(cwd, 2000)
@@ -791,29 +796,70 @@ function flyToUser(highlighter, targetObj) {
         
       });
 }
-
+var numItemsVisible =0;
 function onUserSelect( event ) {
-  if (itemPlane.visible) {
-    itemPlane.visible = false;
+  // if (itemPlane.visible) {
+  //   itemPlane.visible = false;
+  //   fadeInCollection();
+  // } else {
+  //   if (highlighter1.visible) {
+  //     itemPlane.position.copy(highlighter1.position);
+  //     fadeOutCollection();
+  //     itemPlane.visible = true;
+  //     highlighter1.visible = false;
+
+  //     flyToUser(highlighter1, itemPlane);
+
+  //   } else if (highlighter2.visible) {
+  //     itemPlane.position.copy(highlighter2.position);
+  //     fadeOutCollection();
+  //     itemPlane.visible = true;
+  //     highlighter2.visible = false;
+
+  //     flyToUser(highlighter2, itemPlane);
+  //   }
+  // }
+  
+
+  // Reset Items
+  if(!highlighter1.visible && !highlighter2.visible){
     fadeInCollection();
-  } else {
-    if (highlighter1.visible) {
-      itemPlane.position.copy(highlighter1.position);
-      fadeOutCollection();
-      itemPlane.visible = true;
-      highlighter1.visible = false;
-
-      flyToUser(highlighter1, itemPlane);
-
-    } else if (highlighter2.visible) {
-      itemPlane.position.copy(highlighter2.position);
-      fadeOutCollection();
-      itemPlane.visible = true;
-      highlighter2.visible = false;
-
-      flyToUser(highlighter2, itemPlane);
+    // turn off all items
+    itemArray.forEach(item => {
+      if(item.visible) item.visible = false;
+    });
+    // reset allowable visible items to zero
+    numItemsVisible = 0;
+  } else{
+    // increase number of items allowed to be visible
+    numItemsVisible ++;
+    for(let i = 0; i < itemArray.length; i++){
+      // Fade out collection for first visible item
+      if(numItemsVisible === 1 ){
+        fadeOutCollection();
+      }
+      // hacky way to spawn next item
+      if(i === numItemsVisible-1){
+        if(highlighter1.visible){
+          itemArray[i].position.copy(highlighter1.position);
+          itemArray[i].visible = true;
+          highlighter1.visible = false;
+          flyToUser(highlighter1, itemArray[i]);
+          console.log(`item: ${itemArray[i].name}`)
+        } else if(highlighter2){
+          itemArray[i].position.copy(highlighter2.position);
+          itemArray[i].visible = true;
+          highlighter2.visible = false;
+          flyToUser(highlighter2, itemArray[i]);
+          console.log(`item: ${itemArray[i].name}`)
+        }
+      }
     }
   }
+
+  
+
+
 }
 
 document.addEventListener( 'click', onUserSelect, false );
@@ -919,32 +965,52 @@ function drawTestGeoms() {
 
 function drawUI() {
 
+  
+  // var texture = loader.load( '../img/ui-bracelet.png' );
+
+  
+
   var loader = new THREE.TextureLoader();
-  var texture = loader.load( '../img/ui-bracelet.png' );
-
-  const geometry = new THREE.PlaneGeometry( 12*0.6, 17.18*0.6, 16 ); 
-  const material = new THREE.MeshBasicMaterial( { 
-    map: texture, 
-    opacity: 1.0, 
-    transparent: true,  
-    depthWrite: true, 
-    blending: THREE.NormalBlending 
-  } );
-
-  const UIMaterial = new THREE.SpriteMaterial({
-      //map: texture,
-      color: '#69f',
-      transparent: true,
-      opacity: 0.5,
-      depthWrite: false,
-      depthTest: false
+  itemArray = [];
+  // Set ITEM PLANES HERE
+  IMAGE_NAMES = ["ui-bracelet.png", "sunflower.png", "ui-controls-solid.png" ];
+  IMAGE_NAMES.forEach(imageName => {
+    // load texture from file
+    var texture = loader.load(`../img/${imageName}`);
+    const geometry = new THREE.PlaneGeometry( 12*0.6, 17.18*0.6, 16 ); 
+    const material = new THREE.MeshBasicMaterial( { 
+      map: texture, 
+      opacity: 1.0, 
+      transparent: true,  
+      depthWrite: true, 
+      blending: THREE.NormalBlending 
+    } );
+    var itemMesh = new THREE.Mesh( geometry, material );
+    // give item name for future identification purposes
+    itemMesh.name = imageName;
+    // position and rotation info unnecessary??
+    itemMesh.position.copy(camera.position);
+    itemMesh.quaternion.copy(camera.quaternion);
+    itemMesh.visible = false;
+    // add object to array of Items (might want to load dynamicall in future)
+    itemArray.push(itemMesh);
+    scene.add(itemMesh);
   });
+  
+  // const UIMaterial = new THREE.SpriteMaterial({
+  //     //map: texture,
+  //     color: '#69f',
+  //     transparent: true,
+  //     opacity: 0.5,
+  //     depthWrite: false,
+  //     depthTest: false
+  // });
 
-  itemPlane = new THREE.Mesh( geometry, material );
-  itemPlane.position.copy(camera.position); 
-  itemPlane.quaternion.copy( camera.quaternion );
-  itemPlane.visible = false;
-  scene.add( itemPlane );
+  // itemPlane = new THREE.Mesh( geometry, material );
+  // itemPlane.position.copy(camera.position); 
+  // itemPlane.quaternion.copy( camera.quaternion );
+  // itemPlane.visible = false;
+  // scene.add( itemPlane );
   // meshobj.add(itemPlane);
   // uiGroup.add( meshobj );
 
@@ -957,17 +1023,17 @@ function drawUI() {
   scene.add( mediaBttn );
   group.add( mediaBttn );
  */
-  var testGeo = new THREE.PlaneBufferGeometry();
-  var testMat = new THREE.MeshBasicMaterial( { map: texture, opacity: 0.8, transparent: true,  depthWrite: false, depthTest: false  } );
+  // var testGeo = new THREE.PlaneBufferGeometry();
+  // var testMat = new THREE.MeshBasicMaterial( { map: texture, opacity: 0.8, transparent: true,  depthWrite: false, depthTest: false  } );
 
-  const testMesh = new THREE.Mesh( testGeo, testMat );
-  testMesh.position.set(2, 2, camera.position.z -5);
-  testMesh.quaternion.copy( camera.quaternion );
-  testMesh.width = 80;
-  testMesh.height = 48;
-  scene.add( testMesh );
-  //meshobj.add(testMesh);
-  uiGroup.add( testMesh );
+  // const testMesh = new THREE.Mesh( testGeo, testMat );
+  // testMesh.position.set(2, 2, camera.position.z -5);
+  // testMesh.quaternion.copy( camera.quaternion );
+  // testMesh.width = 80;
+  // testMesh.height = 48;
+  // scene.add( testMesh );
+  // //meshobj.add(testMesh);
+  // uiGroup.add( testMesh );
 }
 
 
